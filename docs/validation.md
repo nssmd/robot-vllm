@@ -58,3 +58,19 @@ Local release checks: 105 tests passed and one optional MuJoCo test was skipped 
 the general Python environment; a ROS-compatible environment separately exercised
 MuJoCo dynamics and native crash recovery. HTTP service smoke, non-root container
 startup/task execution, Compose validation, lint, wheel and source builds passed.
+
+## 0.5 OpenPI client walkthrough
+
+The pinned official `openpi-client` package was installed directly from its GitHub
+subdirectory. Both the CPU walkthrough and the native ROS 2 walkthrough completed
+two parallel robot branches, two VLA calls per robot, and a dependent Trigger
+service consumption. The client and ROS transports are real; default model
+responses and controller observations are declared synthetic. No Pi 0.5 checkpoint
+was loaded for these protocol checks. The first development attempt exposed bridge
+admission set to one request and a missing PyYAML in an isolated ROS environment;
+the bridge concurrency and environment were corrected, and earlier logs retained.
+
+The 0.5 dependency environment completed 116 Python tests with one optional
+MuJoCo skip. The Pi 0.5 tests explicitly invoke the installed upstream client
+class; preprocessing uses its image_tools utility. Runtime configuration
+validation accepts the published two-robot arm/gripper/service topology.

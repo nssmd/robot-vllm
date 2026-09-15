@@ -98,7 +98,14 @@ def main():
             command.add_argument("--backend", choices=("mock", "ros2"), default="mock")
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8765)
+    quick = sub.add_parser("quickstart", help="Try GPT-6/OpenPI APIs and two robots without model weights")
+    quick.add_argument("--transport", choices=("mock", "ros2"), default="mock")
+    quick.add_argument("--real-models", action="store_true", help="Use GP6_ENDPOINT and OPENPI_URI with synthetic robot observations")
+    quick.add_argument("--output", type=Path, default=Path("runs/quickstart"))
     args = parser.parse_args()
+    if args.command == "quickstart":
+        from .quickstart import run as quickstart
+        return asyncio.run(quickstart(args))
     if getattr(args, "backend", None) == "ros2" and not args.config:
         parser.error("--backend ros2 requires --config")
     return asyncio.run(run(args))

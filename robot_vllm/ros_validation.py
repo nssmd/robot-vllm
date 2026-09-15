@@ -19,27 +19,30 @@ from .control import DeviceRuntime, Rejected
 from .runtime import write_json
 
 
-def controller_main(namespace: str, ready: Path, stop_delay_s: float):
+def controller_main(namespace: str, ready: Path, stop_delay_s: float, joint_count=2, with_gripper=False):
     import rclpy
-    from control_msgs.action import FollowJointTrajectory
+    from control_msgs.action import FollowJointTrajectory, GripperCommand
     from rclpy.action import ActionServer, CancelResponse, GoalResponse
     from rclpy.callback_groups import ReentrantCallbackGroup
     from rclpy.executors import MultiThreadedExecutor
     from sensor_msgs.msg import Image, JointState
+    from std_srvs.srv import Trigger
     rclpy.init()
     node = rclpy.create_node("fixture_controller", namespace=namespace)
     group = ReentrantCallbackGroup()
     lock = threading.Lock()
-    state = [0.0, 0.0]
-    joints = ["joint_1", "joint_2"]
+    state = [0.0] * joint_count
+    joints = [f"joint_{i+1}" for i in range(joint_count)]
+    gripper_state = [0.08]
     publisher = node.create_publisher(JointState, "joint_states", 10)
     camera = node.create_publisher(Image, "camera/image_raw", 10)
+    wrist = node.create_publisher(Image, "wrist/image_raw", 10) if with_gripper else None
     def publish():
         message = JointState()
         message.header.stamp = node.get_clock().now().to_msg()
-        message.name = joints
+        message.name = joints + (["gripper_joint"] if with_gripper else [])
         with lock:
-            message.position = list(state)
+            message.position = list(state) + (list(gripper_state) if with_gripper else [])
         publisher.publish(message)
         image = Image()
         image.header.stamp = message.header.stamp
@@ -48,6 +51,10 @@ def controller_main(namespace: str, ready: Path, stop_delay_s: float):
         intensity = max(0, min(255, int(128 + message.position[0] * 100)))
         image.data = bytes([intensity, 40, 100]) * (16 * 16)
         camera.publish(image)
+        if wrist is not None:
+            image.header.frame_id = namespace + "/synthetic_wrist"
+            image.data = bytes([40, intensity, 180]) * (16 * 16)
+            wrist.publish(image)
     timer = node.create_timer(0.02, publish, callback_group=group)
     def execute(handle):
         start = time.monotonic()
@@ -85,6 +92,24 @@ def controller_main(namespace: str, ready: Path, stop_delay_s: float):
                           execute_callback=execute, callback_group=group,
                           goal_callback=lambda _: GoalResponse.ACCEPT,
                           cancel_callback=lambda _: CancelResponse.ACCEPT)
+    def grip_execute(handle):
+        time.sleep(0.04)
+        result = GripperCommand.Result()
+        if handle.is_cancel_requested:
+            handle.canceled()
+        else:
+            with lock:
+                gripper_state[0] = handle.request.command.position
+            result.position, result.effort, result.reached_goal = gripper_state[0], 0.0, True
+            handle.succeed()
+        return result
+    grip_action = ActionServer(node, GripperCommand, "gripper_command", execute_callback=grip_execute,
+        callback_group=group, goal_callback=lambda _: GoalResponse.ACCEPT,
+        cancel_callback=lambda _: CancelResponse.ACCEPT) if with_gripper else None
+    def scan(request, response):
+        response.success, response.message = True, "Synthetic scene service consumed; no task-success verdict."
+        return response
+    scan_service = node.create_service(Trigger, "scan", scan, callback_group=group) if with_gripper else None
     executor = MultiThreadedExecutor(num_threads=3)
     executor.add_node(node)
     write_json(ready, {"pid": os.getpid(), "namespace": namespace,
@@ -96,6 +121,10 @@ def controller_main(namespace: str, ready: Path, stop_delay_s: float):
     finally:
         executor.shutdown(timeout_sec=2)
         action.destroy()
+        if grip_action is not None:
+            grip_action.destroy()
+        if scan_service is not None:
+            node.destroy_service(scan_service)
         node.destroy_timer(timer)
         node.destroy_node()
         rclpy.try_shutdown()
@@ -232,11 +261,13 @@ def main():
     controller.add_argument("--namespace", required=True)
     controller.add_argument("--ready", required=True, type=Path)
     controller.add_argument("--stop-delay", type=float, default=0.3)
+    controller.add_argument("--joints", type=int, choices=range(1, 17), default=2)
+    controller.add_argument("--with-gripper", action="store_true")
     validation = sub.add_parser("validate")
     validation.add_argument("--output", type=Path, default=Path("runs/ros2-validation"))
     args = parser.parse_args()
     if args.command == "controller":
-        controller_main(args.namespace, args.ready, args.stop_delay)
+        controller_main(args.namespace, args.ready, args.stop_delay, args.joints, args.with_gripper)
     else:
         print(json.dumps(asyncio.run(validate_ros(args.output)), indent=2))
 

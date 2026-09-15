@@ -46,3 +46,10 @@ reported usage. Recorded unmetered calls remain distinct from measured token tot
 
 Tests use explicitly labeled NumPy policy fixtures. They validate conversions and
 the model-serving contract; they do not establish learned-policy task performance.
+
+## Pi 0.5 provider
+
+A concrete provider is now included using the official third-party OpenPI client.
+See [Pi 0.5 integration](pi05.md) and the main README for complete commands.
+The DROID profile uses seven velocity channels plus a separate gripper command;
+it is distinct from the generic absolute/delta joint codec above.

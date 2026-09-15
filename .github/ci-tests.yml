@@ -23,11 +23,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -e '.[test]' ruff
+      - run: python -m pip install -e '.[pi05,test]' ruff
       - run: ruff check robot_vllm tests scripts examples
       - run: python -m pytest -q
       - run: python -m robot_vllm.control_cli demo --arms 4
       - run: python scripts/http_smoke.py
+      - run: robot-runtime quickstart
       - run: python -m robot_vllm.control_cli validate-config --config configs/system.ros2.example.json
       - run: python -m pip install build && python -m build
       - uses: actions/upload-artifact@v4
@@ -45,9 +46,9 @@ jobs:
       - shell: bash
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ros-jazzy-control-msgs ros-jazzy-sensor-msgs python3-venv
+          apt-get install -y --no-install-recommends ros-jazzy-control-msgs ros-jazzy-sensor-msgs ros-jazzy-std-srvs python3-venv git
           python3 -m venv --system-site-packages /opt/test-env
-          /opt/test-env/bin/pip install -e '.[simulation]'
+          /opt/test-env/bin/pip install -e '.[simulation,pi05]'
       - shell: bash
         env:
           ROS_DOMAIN_ID: '173'
@@ -56,6 +57,7 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           /opt/test-env/bin/python -m robot_vllm.system_validation --arms 2
           /opt/test-env/bin/python scripts/ros_restart_smoke.py
+          /opt/test-env/bin/robot-runtime quickstart --transport ros2
       - uses: actions/upload-artifact@v4
         if: always()
         with:

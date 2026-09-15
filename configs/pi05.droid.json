@@ -1,0 +1,122 @@
+{
+  "uri_env": "OPENPI_URI",
+  "model": "pi05_droid",
+  "max_concurrency": 4,
+  "timeout_s": 30,
+  "mappings": {
+    "robot_1.control": {
+      "arm_capability": "robot_1.arm.trajectory",
+      "gripper_capability": "robot_1.hand.gripper",
+      "joint_names": [
+        "joint_1",
+        "joint_2",
+        "joint_3",
+        "joint_4",
+        "joint_5",
+        "joint_6",
+        "joint_7"
+      ],
+      "joint_limits": [
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ]
+      ],
+      "velocity_scale_rad_s": [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+      ],
+      "gripper_open_m": 0.08,
+      "gripper_closed_m": 0,
+      "execution_horizon": 4,
+      "step_s": 0.06666666666666667,
+      "clip_normalized_velocity": true
+    },
+    "robot_2.control": {
+      "arm_capability": "robot_2.arm.trajectory",
+      "gripper_capability": "robot_2.hand.gripper",
+      "joint_names": [
+        "joint_1",
+        "joint_2",
+        "joint_3",
+        "joint_4",
+        "joint_5",
+        "joint_6",
+        "joint_7"
+      ],
+      "joint_limits": [
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ],
+        [
+          -2,
+          2
+        ]
+      ],
+      "velocity_scale_rad_s": [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+      ],
+      "gripper_open_m": 0.08,
+      "gripper_closed_m": 0,
+      "execution_horizon": 4,
+      "step_s": 0.06666666666666667,
+      "clip_normalized_velocity": true
+    }
+  }
+}

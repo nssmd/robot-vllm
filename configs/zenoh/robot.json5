@@ -1,0 +1,16 @@
+{
+  "mode": "client",
+  "connect": {
+    "endpoints": [
+      "tcp/COORDINATOR_IP:7447"
+    ]
+  },
+  "listen": {
+    "endpoints": []
+  },
+  "scouting": {
+    "multicast": {
+      "enabled": false
+    }
+  }
+}

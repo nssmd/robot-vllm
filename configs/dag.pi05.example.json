@@ -1,0 +1,29 @@
+{
+  "schema": "robot_runtime.dag.v1",
+  "nodes": [
+    {
+      "id": "policy_robot_1",
+      "capability": "robot_1.control",
+      "policy": "pi05",
+      "max_rounds": 2,
+      "instruction": "Execute two bounded policy chunks using current camera and joint observations."
+    },
+    {
+      "id": "policy_robot_2",
+      "capability": "robot_2.control",
+      "policy": "pi05",
+      "max_rounds": 2,
+      "instruction": "Execute two bounded policy chunks using current camera and joint observations."
+    },
+    {
+      "id": "consume_scene_service",
+      "capability": "scene.trigger",
+      "policy": "code",
+      "arguments": {},
+      "depends_on": [
+        "policy_robot_1",
+        "policy_robot_2"
+      ]
+    }
+  ]
+}

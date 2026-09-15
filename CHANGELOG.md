@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Add official OpenPI client as a pinned optional third-party dependency and expose π0.5-DROID as a VLA provider.
+- Map DROID camera/state inputs and normalized velocity/gripper outputs explicitly; dispatch bounded prefixes to arm/gripper groups.
+- Add ROS GripperCommand and Trigger service adapters plus a complete two-robot quickstart in mock and actual ROS transport modes.
+- Expand README with installation, expected output, real GPT-6/OpenPI endpoints, multi-host Zenoh routing, and task API examples.
+
+
 ## 0.4.0
 
 - Persist execution intent, native action locators, settlement, task request IDs

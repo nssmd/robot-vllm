@@ -30,7 +30,9 @@ def validate_config(config):
         backend = device.get("backend", "ros2") if isinstance(device, dict) else None
         fields = {"mock": {"tick_s", "stop_delay_s"}, "ros2": {
             "action_name", "joint_state_topic", "joint_names", "limits", "state_max_age_s",
-            "camera_topics", "lease_topic", "lease_period_s"}, "plugin": {"factory", "options"}}
+            "camera_topics", "lease_topic", "lease_period_s"}, "plugin": {"factory", "options"},
+            "ros2_gripper": {"action_name", "joint_state_topic", "joint_name", "state_scale", "min_position_m", "max_position_m", "state_max_age_s"},
+            "ros2_service": {"service_name", "resources"}}
         if backend not in fields:
             raise ValueError("unknown_device_backend")
         keys(device, common | fields[backend], ["name"], "device")
@@ -70,6 +72,31 @@ def validate_config(config):
             number(device.get("tick_s", 0.01), 0.0001, 10, "tick_s")
             number(device.get("stop_delay_s", 0), 0, 60, "stop_delay_s")
             capabilities.add(name + ".move")
+        elif backend in ("ros2_gripper", "ros2_service"):
+            required = ["action_name", "joint_state_topic", "joint_name"] if backend == "ros2_gripper" else ["service_name"]
+            keys(device, common | fields[backend], required, name)
+            for field in required:
+                if not isinstance(device[field], str) or not device[field]:
+                    raise ValueError("invalid_ros_endpoint")
+                if field != "joint_name" and not device[field].startswith("/"):
+                    raise ValueError("absolute_ros_name_required:" + field)
+            if backend == "ros2_gripper":
+                if device["action_name"] in actions:
+                    raise ValueError("duplicate_physical_action_endpoint")
+                actions.add(device["action_name"])
+                for key, default in [("state_scale", 1), ("state_max_age_s", 2)]:
+                    number(device.get(key, default), .001, 100, key)
+                lo, hi = device.get("min_position_m", 0), device.get("max_position_m", .08)
+                number(lo, 0, 1, "min_position_m")
+                number(hi, 0, 1, "max_position_m")
+                if lo >= hi:
+                    raise ValueError("invalid_gripper_range")
+                capabilities.add(name + ".gripper")
+            else:
+                resources = device.get("resources", [])
+                if not isinstance(resources, list) or any(not isinstance(r, str) or not r for r in resources):
+                    raise ValueError("invalid_service_resources")
+                capabilities.add(name + ".trigger")
         elif not isinstance(device.get("factory"), str) or ":" not in device["factory"] or not isinstance(device.get("options", {}), dict):
             raise ValueError("invalid_plugin_factory")
     groups = config.get("groups", [])

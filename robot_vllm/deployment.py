@@ -29,11 +29,16 @@ class Deployment:
                 name = device["name"]
                 if backend == "mock":
                     driver = MockArm(**device)
-                elif backend == "ros2":
+                elif backend in ("ros2", "ros2_gripper", "ros2_service"):
                     from .adapters.ros2 import JointTrajectoryDriver, Ros2Session
                     if self.session is None:
                         self.session = Ros2Session()
-                    driver = JointTrajectoryDriver(self.session, **device)
+                    if backend == "ros2":
+                        driver = JointTrajectoryDriver(self.session, **device)
+                    else:
+                        from .adapters.ros2_services import GripperDriver, TriggerServiceDriver
+                        factory = GripperDriver if backend == "ros2_gripper" else TriggerServiceDriver
+                        driver = factory(self.session, **device)
                 elif backend == "plugin":
                     # This configuration is supplied by the operator, not a model response.
                     module, factory = device.pop("factory").split(":", 1)
