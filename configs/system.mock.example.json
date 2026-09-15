@@ -1,0 +1,11 @@
+{
+  "schema": "robot_runtime.config.v1",
+  "devices": [
+    {"name": "robot.arm_1", "backend": "mock", "robot_id": "robot_1"},
+    {"name": "robot.arm_2", "backend": "mock", "robot_id": "robot_2"}
+  ],
+  "groups": [{"name": "robot.coordinated", "members": ["robot.arm_1.move", "robot.arm_2.move"]}],
+  "scheduler": {"max_parallel": 4, "max_replans": 1, "max_active_tasks": 16},
+  "runtime": {"observation_ttl_s": 2, "cancel_timeout_s": 2},
+  "api": {"max_body_bytes": 2097152}
+}

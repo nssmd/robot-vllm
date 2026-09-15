@@ -1,0 +1,7 @@
+{
+  "joint_names": ["joint_1", "joint_2"],
+  "limits": [[-1.0, 1.0], [-1.0, 1.0]],
+  "step_s": 0.1,
+  "mode": "absolute",
+  "max_chunk": 16
+}

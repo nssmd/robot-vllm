@@ -1,0 +1,25 @@
+[Unit]
+Description=Robot Runtime coordinator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=robot-runtime
+Group=robot-runtime
+WorkingDirectory=/opt/robot-runtime
+EnvironmentFile=/etc/robot-runtime/runtime.env
+ExecStart=/opt/robot-runtime/bin/robot-runtime serve --config /etc/robot-runtime/system.json --state-dir /var/lib/robot-runtime --output /var/log/robot-runtime
+Restart=on-failure
+RestartSec=5
+StateDirectory=robot-runtime
+LogsDirectory=robot-runtime
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/robot-runtime /var/log/robot-runtime
+
+[Install]
+WantedBy=multi-user.target

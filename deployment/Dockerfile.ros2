@@ -1,0 +1,16 @@
+FROM ros:jazzy-ros-base
+SHELL ["/bin/bash", "-c"]
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-control-msgs ros-jazzy-sensor-msgs ros-jazzy-rmw-zenoh-cpp python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY pyproject.toml README.md LICENSE ./
+COPY robot_vllm ./robot_vllm
+RUN python3 -m venv --system-site-packages /opt/runtime \
+    && /opt/runtime/bin/pip install --no-cache-dir '.[serve,simulation]' \
+    && useradd --uid 10001 --create-home runtime \
+    && mkdir -p /var/lib/robot-runtime /var/log/robot-runtime \
+    && chown -R runtime:runtime /var/lib/robot-runtime /var/log/robot-runtime
+ENV PATH="/opt/runtime/bin:${PATH}"
+USER runtime
+ENTRYPOINT ["/ros_entrypoint.sh", "robot-runtime", "serve", "--host", "0.0.0.0", "--state-dir", "/var/lib/robot-runtime", "--output", "/var/log/robot-runtime"]

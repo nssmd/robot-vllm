@@ -1,0 +1,23 @@
+{
+  "devices": [
+    {"name": "robot_1.left_arm", "robot_id": "robot_1", "kind": "arm", "backend": "ros2",
+     "action_name": "/robot_1/left_arm/joint_trajectory_controller/follow_joint_trajectory",
+     "joint_state_topic": "/robot_1/left_arm/joint_states",
+     "joint_names": ["joint_1", "joint_2"], "limits": [[-1.0, 1.0], [-1.0, 1.0]],
+     "camera_topics": {"front": "/robot_1/camera/image_raw"}},
+    {"name": "robot_2.right_arm", "robot_id": "robot_2", "kind": "arm", "backend": "ros2",
+     "action_name": "/robot_2/right_arm/joint_trajectory_controller/follow_joint_trajectory",
+     "joint_state_topic": "/robot_2/right_arm/joint_states",
+     "joint_names": ["joint_1", "joint_2"], "limits": [[-1.0, 1.0], [-1.0, 1.0]],
+     "camera_topics": {"front": "/robot_2/camera/image_raw"}}
+  ],
+  "groups": [{"name": "cell.coordinated", "members": ["robot_1.left_arm.trajectory", "robot_2.right_arm.trajectory"]}],
+  "models": {
+    "gp6": {"kind": "openai_responses", "model": "gpt-6-astra", "endpoint_env": "GP6_ENDPOINT",
+            "key_env": "GP6_API_KEY", "reasoning_effort": "medium", "timeout_s": 60},
+    "vla": {"kind": "vla_json", "model": "YOUR_VLA_MODEL", "endpoint_env": "VLA_ENDPOINT",
+            "key_env": "VLA_API_KEY", "timeout_s": 30}
+  },
+  "planner": "gp6",
+  "scheduler": {"max_parallel": 4, "max_replans": 1}
+}

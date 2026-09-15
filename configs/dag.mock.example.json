@@ -1,0 +1,13 @@
+{
+  "schema": "robot_runtime.dag.v1",
+  "nodes": [
+    {"id": "prepare_left", "capability": "robot.arm_1.move", "policy": "code",
+     "arguments": {"target": 0.2, "steps": 10}},
+    {"id": "prepare_right", "capability": "robot.arm_2.move", "policy": "code",
+     "arguments": {"target": -0.2, "steps": 10}},
+    {"id": "coordinate", "capability": "robot.coordinated", "policy": "code",
+     "depends_on": ["prepare_left", "prepare_right"],
+     "arguments": {"members": {"robot.arm_1.move": {"target": 0.3, "steps": 10},
+                                "robot.arm_2.move": {"target": -0.3, "steps": 10}}}}
+  ]
+}

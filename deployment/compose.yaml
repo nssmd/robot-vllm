@@ -1,0 +1,23 @@
+services:
+  runtime:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      ROBOT_RUNTIME_TOKEN: ${ROBOT_RUNTIME_TOKEN:?Set a runtime API token}
+    volumes:
+      - runtime-state:/var/lib/robot-runtime
+      - runtime-evidence:/var/log/robot-runtime
+    cpus: 2
+    mem_limit: 2g
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/livez',timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+volumes:
+  runtime-state:
+  runtime-evidence:

@@ -1,0 +1,8 @@
+include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md .dockerignore
+include docs/architecture.md docs/api.md docs/deployment.md docs/vla.md docs/validation.md
+recursive-include configs *.json
+recursive-include deployment Dockerfile* *.yaml *.service
+recursive-include examples *.py
+recursive-include scripts *.py
+include .github/ci-tests.yml
+include docs/ci.md
