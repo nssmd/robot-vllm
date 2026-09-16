@@ -72,6 +72,15 @@ Model servers perform inference; robot controllers handle real-time control.
 
 ## Measured results
 
+**Native ROS 2 four-arm integration:** Actual GPT-5.5 and four independent synthetic
+controllers completed all 24 tested actions across three starting states and two
+conditions. Targets matched, with feedback error below 0.001 rad. Shared requests
+reduced calls **12 → 3** and actual total tokens **2,892 → 854 (−70.5%)**. Provider
+cache reads were zero; savings came from request consolidation. Paired median
+sensing-to-action completion time fell 10.2%, a preliminary three-pair observation.
+This tests ROS transport/control, not physical grasping.
+[Commands and detailed results](docs/ROS_SHARED_CONTROL.md)
+
 **Current validation scope:** ROS 2 coordination of multiple arms, and the effect
 of shared perception/caching on model calls, tokens and waiting. A fixed 10×10
 manipulation campaign is not required. The slider results below remain limited

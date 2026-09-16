@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a runnable native ROS 2 four-arm shared-state/model-call comparison with
+  changing paired initial states, measured provider tokens and final joint feedback.
+
 - Add opt-in cross-trial GPT prompt-prefix ordering, provider cache keys and explicit
   breakpoints, cached-input/write metering and an actual-endpoint comparison script.
 - Ensure Responses JSON mode includes JSON in the user input, and allow explicit
