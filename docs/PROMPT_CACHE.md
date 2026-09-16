@@ -1,5 +1,10 @@
 # GPT prompt caching across trials
 
+**Diagnostic update:** GPT-5.5 has verified text and image cache hits, including
+image-prefix reuse after changing suffix text. Hits were intermittent; earlier
+all-zero runs remain historical observations, not proof that the deployment cannot
+cache. See [provider cache diagnosis](CACHE_DIAGNOSIS.md).
+
 For a changing camera stream, use the explicit [observation history component](OBSERVATION_HISTORY.md)
 to append fresh frames while preserving useful historical prefixes. This does not
 make similar new frames interchangeable. GPT-5.5 reference/history experiments
@@ -92,7 +97,7 @@ the user input when using JSON mode; this was corrected. Subsequent attempts,
 including one after the token renewal window, returned HTTP 429 with
 `rate_limit_exceeded` and exhausted remaining token quota. Those attempts stopped
 and their records remain under local `runs/prompt-cache-gpt6-*` directories.
-There is currently **no successful real-provider cache-hit or latency result**
+There was **no successful real-provider cache-hit or latency result**
 from this comparison. Missing usage on failed calls must not be interpreted as
 zero tokens or as proof that caching failed. Resume measurement when endpoint
 quota is available, using a fresh output directory and preserving these attempts.

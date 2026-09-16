@@ -60,8 +60,9 @@ experiment below and is not automatically enabled in every ROS driver.
 Trials of the same task can opt into [GPT prefix-cache layout](docs/PROMPT_CACHE.md):
 stable capabilities and task text precede current observations, with optional
 provider-supported cache keys/breakpoints and reported cache read/write metering.
-This does not replay actions or reduce logical input tokens. Actual cache-hit gains
-remain to be verified with available endpoint quota.
+This does not replay actions or reduce logical input tokens. Later diagnostics verified
+GPT-5.5 visual-prefix reuse, with intermittent misses and no established latency gain.
+See [cache diagnosis](docs/CACHE_DIAGNOSIS.md).
 
 Changing camera streams can opt into [bounded observation history](docs/OBSERVATION_HISTORY.md),
 appending fresh frames each round. Eight GPT-5.5 replay answers were correct, but
