@@ -101,6 +101,10 @@ class RobotSystem:
             "max_parallel": self.max_parallel, "max_replans": self.max_replans,
             "deadline_s": deadline_s, "planner": self.planner_name if planner else "provided_plan",
             "models": {name: {"kind": e.kind, "model": e.model, "timeout_s": e.timeout,
+                "cache_layout": e.config.get("cache_layout", False),
+                "cache_breakpoint": e.config.get("cache_breakpoint", False),
+                "prompt_cache_key": e.config.get("prompt_cache_key"),
+                "max_output_tokens": e.config.get("max_output_tokens"),
                 "inference": {"max_concurrency": e.pool.limit, "max_queue": e.pool.max_queue,
                               "queue_timeout_s": e.pool.queue_timeout}}
                 for name, e in self.endpoints.items()}})

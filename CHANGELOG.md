@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add opt-in cross-trial GPT prompt-prefix ordering, provider cache keys and explicit
+  breakpoints, cached-input/write metering and an actual-endpoint comparison script.
+- Ensure Responses JSON mode includes JSON in the user input, and allow explicit
+  output-token budgets. Actual cache-hit gains are not yet established.
+
 - Add bounded shared-perception caching with immutable frame/query identities,
   concurrent subscriber sharing, source-generation invalidation and expiry.
 - Add an actual-model MuJoCo visual-reaching comparison with independent,

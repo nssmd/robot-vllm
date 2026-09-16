@@ -57,6 +57,12 @@ experiment below and is not automatically enabled in every ROS driver.
 | Execution and recovery | Enforce resource exclusion, coordinate groups, confirm cancellation, persist intent and recover original ROS goal results |
 | Metering | Record tokens, queue wait and model-call time; inspect capacity and cancellation through `/inference` |
 
+Trials of the same task can opt into [GPT prefix-cache layout](docs/PROMPT_CACHE.md):
+stable capabilities and task text precede current observations, with optional
+provider-supported cache keys/breakpoints and reported cache read/write metering.
+This does not replay actions or reduce logical input tokens. Actual cache-hit gains
+remain to be verified with available endpoint quota.
+
 Cross-view alignment and automatic scene-change detection remain future work.
 Model servers perform inference; robot controllers handle real-time control.
 

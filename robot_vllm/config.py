@@ -118,7 +118,7 @@ def validate_config(config):
         raise ValueError("invalid_models")
     for alias, model in models.items():
         keys(model, {"kind", "model", "endpoint", "endpoint_env", "key_env", "timeout_s",
-            "reasoning_effort", "stream", "structured_output", "verify_model", "inference"}, ["kind", "model"], "model")
+            "reasoning_effort", "stream", "structured_output", "verify_model", "inference", "cache_layout", "cache_breakpoint", "prompt_cache_key", "max_output_tokens"}, ["kind", "model"], "model")
         if alias == "code" or model["kind"] not in ("openai_chat", "openai_responses", "vla_json"):
             raise ValueError("invalid_model_kind_or_alias")
         if not isinstance(model["model"], str) or not model["model"]:
@@ -128,13 +128,20 @@ def validate_config(config):
         if model.get("endpoint") and not model["endpoint"].startswith(("http://", "https://")):
             raise ValueError("invalid_model_endpoint")
         number(model.get("timeout_s", 30), 0.01, 120, "model_timeout_s")
+        if "max_output_tokens" in model:
+            number(model["max_output_tokens"], 1, 32768, "max_output_tokens", integer=True)
+        if "prompt_cache_key" in model and (not isinstance(model["prompt_cache_key"], str)
+                or not 1 <= len(model["prompt_cache_key"]) <= 64):
+            raise ValueError("invalid_prompt_cache_key")
         inference = model.get("inference", {})
         keys(inference, {"max_concurrency", "max_queue", "queue_timeout_s"}, where="inference")
         from .inference import InferencePool
         InferencePool(**inference)
-        for flag in ("stream", "structured_output", "verify_model"):
+        for flag in ("stream", "structured_output", "verify_model", "cache_layout", "cache_breakpoint"):
             if flag in model and type(model[flag]) is not bool:
                 raise ValueError("invalid_model_flag:" + flag)
+        if model.get("cache_breakpoint") and (not model.get("cache_layout") or model["kind"] == "vla_json"):
+            raise ValueError("cache_breakpoint_requires_language_model_cache_layout")
     scheduler = config.get("scheduler", {})
     keys(scheduler, {"max_parallel", "max_replans", "max_active_tasks"}, where="scheduler")
     for name, low, high in [("max_parallel", 1, 64), ("max_replans", 0, 3), ("max_active_tasks", 1, 256)]:
