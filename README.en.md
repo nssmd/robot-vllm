@@ -2,6 +2,12 @@
 
 [简体中文](README.md) | **English**
 
+> **🚧 Under active development — contributions welcome!**
+> Features, interfaces and documentation are evolving. Share ideas, report bugs and
+> discuss experiments through [Issues](https://github.com/nssmd/robot-vllm/issues),
+> or submit a pull request with model integrations, robot adapters, perception and
+> inference optimizations, tests or documentation. See the [contributing guide](CONTRIBUTING.md).
+
 **A runtime connecting GPT, VLA policies and robots through shared perception, inference scheduling, action execution and recovery.**
 
 Robot state can change while a model is thinking, and multiple robots may process

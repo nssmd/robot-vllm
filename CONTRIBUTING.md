@@ -1,5 +1,12 @@
 # Contributing
 
+Robot-vLLM is under active development, and contributions are welcome. You can
+help with model integrations, robot adapters, perception and inference efficiency,
+reproducible experiments, bug fixes, tests or documentation. Open an
+[issue](https://github.com/nssmd/robot-vllm/issues) to share a use case or discuss a
+larger change, or submit a pull request for a focused improvement. Issues and pull
+requests in English or Chinese are welcome; hardware is not required to contribute.
+
 Treat multiple arms and multiple robots as normal deployments. A single arm is
 a topology with one device, not a different architecture. Put embodiment-specific
 dimensions, joint order, units, limits and transforms in adapters/capabilities.
