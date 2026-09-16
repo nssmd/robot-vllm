@@ -22,6 +22,13 @@ from robot_vllm.runtime import Journal, write_json
 from robot_vllm.sensing import SenseKey, SharedPerception
 
 
+def cache_context(catalog, topology, snapshot, requested, round_id, ordered):
+    stable = {'capabilities': catalog, 'topology': topology,
+              'joint_order': ['joint_1', 'joint_2'], 'limits_rad': [-.8, .8]}
+    current = {'round': round_id, 'joint_positions_rad': snapshot, 'requested_arms': requested}
+    return {**stable, **current} if ordered else {**current, **stable}
+
+
 def validate_targets(value, names):
     if not isinstance(value, dict) or set(value) != set(names):
         raise Rejected('model_target_names_mismatch')
@@ -50,6 +57,7 @@ async def run(args):
         'key_env':'ROS_SHARED_MODEL_KEY' if args.azure_cli else args.key_env,
         'max_output_tokens':256,'reasoning_effort':'low','timeout_s':90,'inference':{'max_concurrency':4}})
     rows = []
+    variants_all = ['dynamic_first', 'stable_first'] if args.cache_comparison else ['independent', 'shared']
     try:
         devices = []
         prefix = '/shared_' + runtime.runtime_id[:8]
@@ -68,11 +76,13 @@ async def run(args):
         await deployment.ready(15)
         names = [d['name']+'.trajectory' for d in devices]
         write_json(args.output/'manifest.json', {'model':args.model,'rounds':args.rounds,
-            'variants':['independent','shared'],'arms':4,'joints_per_arm':2,
+            'variants':variants_all,'arms':4,'joints_per_arm':2,
             'controllers':'synthetic','transport':'native ROS2','input':'joint-state snapshot, no images',
             'same_snapshot_within_pair':True,'order':'alternates per round','provider_cache':'not forced',
             'rule':'negate both measured joints of each requested arm', 'tolerance_rad':.001,
-            'initial_state_schedule':'sign alternates per round; magnitude = 0.1*(arm_index+1)+0.01*round'})
+            'initial_state_schedule':'sign alternates per round; magnitude = 0.1*(arm_index+1)+0.01*round',
+            'cache_comparison':args.cache_comparison,'warmup_round':0 if args.cache_comparison else None,
+            'same_calls_per_condition':bool(args.cache_comparison), 'interval_s':args.interval})
         async def dispatch(targets, observations, identity):
             operations = await asyncio.gather(*(runtime.submit(owner='shared-control',request_id=identity+'-'+name,
                 capability=name, observation_id=observations[name]['observation_id'],
@@ -99,7 +109,7 @@ async def run(args):
             await dispatch(initial,obs,f'reset-{round_id}-initial')
             snapshot = {name:(await runtime.observe(name))['data']['positions_rad'] for name in names}
             write_json(args.output/f'snapshot-{round_id}.json',snapshot)
-            variants = ['independent','shared'] if round_id%2==0 else ['shared','independent']
+            variants = variants_all if round_id%2==0 else list(reversed(variants_all))
             for variant in variants:
                 obs = {name:await runtime.observe(name) for name in names}
                 await dispatch(initial,obs,f'reset-{round_id}-{variant}')
@@ -114,6 +124,11 @@ async def run(args):
                 async def predict(requested):
                     context = {'joint_positions_rad':snapshot,'requested_arms':requested,
                         'joint_order':['joint_1','joint_2'],'limits_rad':[-.8,.8]}
+                    if args.cache_comparison:
+                        context = cache_context(runtime.catalog(), runtime.topology(), snapshot,
+                                                requested, round_id, variant == 'stable_first')
+                        endpoint.config['prompt_cache_key'] = 'ros-' + runtime.runtime_id[:16] + '-' + variant
+                    write_json(args.output/f'input-{round_id}-{variant}-{requested[0]}.json',context)
                     value = await endpoint.generate(instruction='Return JSON mapping exactly the requested arm names to two target joint positions in radians. Negate each currently measured joint position. Use the supplied state, without explanation.',
                         context=context,role='state-control',meter=meter)
                     return validate_targets(value,requested)
@@ -122,7 +137,15 @@ async def run(args):
                     values = (await service.get(cache_key,captured,lambda:predict(names))) if variant=='shared' else await predict([name])
                     return name,values[name],time.monotonic()-start
                 start=time.monotonic()
-                responses = await asyncio.gather(*(consume(name) for name in names),return_exceptions=True)
+                if args.cache_comparison:
+                    try:
+                        values = await predict(names)
+                        duration = time.monotonic()-start
+                        responses = [(name,values[name],duration) for name in names]
+                    except Exception as exc:
+                        responses = [exc]
+                else:
+                    responses = await asyncio.gather(*(consume(name) for name in names),return_exceptions=True)
                 failed=[r for r in responses if isinstance(r,BaseException)]
                 if failed:
                     write_json(args.output/f'infra-{round_id}-{variant}.json',{'error':str(failed[0]),'metrics':meter.summary()})
@@ -142,9 +165,11 @@ async def run(args):
                 rows.append(row)
                 write_json(args.output/f'result-{round_id}-{variant}.json',row)
                 print(round_id,variant,'passed',meter.summary()['total_tokens'],round(waiting,3),flush=True)
+                print('cached_input_tokens',meter.summary()['cached_input_tokens'],flush=True)
+                await asyncio.sleep(args.interval)
         summary={'status':'passed','scope':'native ROS synthetic controllers + actual model, no manipulation verdict',
                  'rows':rows,'shared_perception':service.snapshot(),'variants':{}}
-        for variant in ['independent','shared']:
+        for variant in variants_all:
             records=[r for r in rows if r['variant']==variant]
             summary['variants'][variant]={'rounds':len(records),'model_calls':sum(r['model_metrics']['model_calls'] for r in records),
                 'tokens':{k:sum(r['model_metrics'][k] for r in records) for k in ['prompt_tokens','completion_tokens','total_tokens','cached_input_tokens']},
@@ -185,8 +210,10 @@ def main():
     parser.add_argument('--key-env',default='GP6_API_KEY')
     parser.add_argument('--rounds',type=int,default=3)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--cache-comparison',action='store_true',help='One request per condition; same catalog and state, different prefix order')
+    parser.add_argument('--interval',type=float,default=0)
     args=parser.parse_args()
-    if not args.endpoint or not 1<=args.rounds<=10:
+    if not args.endpoint or not 1<=args.rounds<=10 or not 0<=args.interval<=60:
         parser.error('endpoint and 1..10 rounds required')
     asyncio.run(run(args))
 

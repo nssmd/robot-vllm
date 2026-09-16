@@ -73,6 +73,13 @@ Model servers perform inference; robot controllers handle real-time control.
 
 ## Measured results
 
+**Separate cache comparison:** With equal call counts and input information,
+stable-prefix ordering achieved 2/6 post-warmup GPT-5.5 cache hits: 2,560 cached
+input tokens (26.6%), versus zero in the control. All 56 native four-arm ROS actions
+completed across seven paired rounds. Logical input tokens did not decrease;
+output-length differences prevent attributing timing changes solely to caching.
+[Full cache comparison](docs/ROS_CACHE_COMPARISON.md)
+
 **Native ROS 2 four-arm integration:** Actual GPT-5.5 and four independent synthetic
 controllers completed all 24 tested actions across three starting states and two
 conditions. Targets matched, with feedback error below 0.001 rad. Shared requests

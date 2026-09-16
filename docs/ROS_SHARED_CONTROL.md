@@ -1,5 +1,9 @@
 # ROS 2 multi-arm control with fewer model requests
 
+For a separate test with **equal model-call counts** and different cache layouts,
+see [the matched ROS cache comparison](ROS_CACHE_COMPARISON.md). The results below
+measure request consolidation and must not be presented as provider cache savings.
+
 This example connects the existing shared-perception service to native ROS 2
 action execution. Four independent controller processes publish `JointState` and
 execute `FollowJointTrajectory`. An actual language model proposes two joint
