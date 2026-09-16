@@ -72,6 +72,11 @@ Model servers perform inference; robot controllers handle real-time control.
 
 ## Measured results
 
+**Formal robot evaluation standard:** New manipulation-performance and acceleration
+claims require one frozen matched distribution, normally **10 tasks × 10 seeds
+per task × each condition**. The slider results below are historical diagnostics,
+not a substitute for this robot evaluation. See the [formal protocol](docs/ROBOT_EVALUATION_PROTOCOL.md).
+
 **Actual GPT-6 calls and MuJoCo dynamics: shared perception with compact output
 reduced overhead on a simple visual-reaching task.**
 
