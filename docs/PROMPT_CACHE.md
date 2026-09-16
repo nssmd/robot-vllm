@@ -1,5 +1,10 @@
 # GPT prompt caching across trials
 
+For a changing camera stream, use the explicit [observation history component](OBSERVATION_HISTORY.md)
+to append fresh frames while preserving useful historical prefixes. This does not
+make similar new frames interchangeable. GPT-5.5 reference/history experiments
+are reported separately from the earlier GPT-6 request-layout attempts below.
+
 Trials of the same task can reuse a provider's computation of identical prompt
 prefixes. This implementation reorganizes requests; it does not cache responses,
 reuse past actions, or expose a previous trial's state as the current observation.

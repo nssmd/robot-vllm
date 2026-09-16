@@ -63,6 +63,10 @@ provider-supported cache keys/breakpoints and reported cache read/write metering
 This does not replay actions or reduce logical input tokens. Actual cache-hit gains
 remain to be verified with available endpoint quota.
 
+Changing camera streams can opt into [bounded observation history](docs/OBSERVATION_HISTORY.md),
+appending fresh frames each round. Eight GPT-5.5 replay answers were correct, but
+reported cache reads were zero; this workload has no demonstrated cache speedup.
+
 Cross-view alignment and automatic scene-change detection remain future work.
 Model servers perform inference; robot controllers handle real-time control.
 
