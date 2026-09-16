@@ -74,3 +74,98 @@ The 0.5 dependency environment completed 116 Python tests with one optional
 MuJoCo skip. The Pi 0.5 tests explicitly invoke the installed upstream client
 class; preprocessing uses its image_tools utility. Runtime configuration
 validation accepts the published two-robot arm/gripper/service topology.
+
+## 2026-09-15 bridge hardening (local, unreleased)
+
+Reproduced HTTP 500 responses for a non-object VLA request and an upstream
+provider failure. The bridge now validates envelope/ticket/capability structure
+before inference and returns 422 for invalid requests, 502 for provider failures
+and 504 for provider timeouts. Regression checks cover admission recovery and
+ensure no action conversion occurs after provider failure. Native OpenPI checks
+exercise both metadata and inference timeouts, followed by a successful new
+connection.
+
+The Python 3.12 ROS-compatible environment completed **132 tests, with one optional
+MuJoCo test skipped**. This includes the installed official OpenPI client. Ruff
+and whitespace checks passed. CPU and native ROS 2 quickstarts each completed
+two parallel robot branches, four VLA calls and one dependent service node.
+These are fixture integration checks; no pretrained checkpoint was loaded and
+no manipulation task verdict was produced. Walkthrough processes exited after
+their checks.
+
+The first full-suite attempt stalled in the existing HTTP body-limit test because
+the ROS virtual environment inherited FastAPI 0.101.0 / Starlette 0.27.0 from the
+system. An isolated reproduction retained the same failure. FastAPI's minimum
+dependency is now 0.108.0; the full successful suite above used exactly that
+version with Starlette 0.32.0.post1. Diagnostic logs remain under local `runs/`.
+
+## 2026-09-16 ROS concurrency and recovery continuation (local, unreleased)
+
+The four-arm native ROS check passed with four concurrent DAG nodes, four camera
+streams and seven completed executions; no execution failed, was canceled or
+remained uncertain. Responses and motion were synthetic; the ROS transport was
+real. The HTTP smoke also passed authentication, discovery, observation,
+dispatch, idempotency, resource conflicts, concurrency, cancellation and DAG API
+checks.
+
+The two-controller MuJoCo crash/restart check passed. Both controllers held on
+lease expiry after the coordinator's deliberate hard exit. Restart preserved
+quarantine, rejected new work before reconciliation, queried the original native
+goal IDs and released resources only after terminal results. Each controller's
+journal recorded exactly one started goal and one lease-expiry hold. The recovered
+operation is correctly marked failed after the injected crash; this is an expected
+fault outcome, not a manipulation-task failure.
+
+After installing the simulation extra, the previously skipped MuJoCo dynamics
+test passed separately. All local validation workers exited. There are no new
+manipulation task verdicts, pretrained-policy results or cross-host measurements
+from this continuation. Local evidence pointers and counts are retained in
+`runs/continuation-validation-20260916.json`.
+
+## 2026-09-16 shared inference scheduling (local, unreleased)
+
+The model layer now shares bounded FIFO admission across tasks per model alias.
+Planner and node observations are sampled after admission. Canceled blocking HTTP
+calls retain capacity until the underlying transport returns; their late results
+are discarded. Queue overload and timeout are infrastructure outcomes. Expired
+terminal no-action decisions are rejected before node completion.
+
+The final suite passed **151 tests, with no skips**. Regression coverage includes
+1/2/4 concurrent transport limits, queued-cancel/admission races, overload and
+shutdown cleanup, retained capacity after inflight cancellation, fresh observations
+after queueing, task cancellation without late actions, expired action/no-action
+results, authenticated capacity queries and resolved inference limits in task
+manifests. Ruff and whitespace checks passed. The native ROS/OpenPI quickstart
+completed four VLA calls, two parallel robot branches and one dependent service;
+the HTTP service smoke also passed. Model responses and devices were fixtures.
+
+The local latency-overlap script compared four robots × three rounds with one vs
+four inference slots. Both variants completed 12 calls and 12 actions, with no
+transport errors. One preliminary sample measured 1.973 s vs 0.929 s total wall
+time (2.12× ratio), with median queue waits of 0.441 s vs less than 0.001 s. Each
+fixture response included an artificial 100 ms delay; HTTP, Python scheduling and
+host contention also contributed. This is a single local scheduling observation,
+not measured GPT-6/Pi 0.5 compute acceleration or a manipulation-success result.
+Raw evidence is retained in
+`runs/inference-benchmark/2f9e0394541947788dad795cbcb0d0ac/result.json` and per-variant
+task journals. All test workers exited; there are no new simulator task verdicts.
+
+Reproduce with `python scripts/inference_benchmark.py`. The inactive CI template
+also includes this check; no new remote CI run or release is claimed.
+
+## 2026-09-16 real GPT-6 shared-sensing comparison
+
+A separate frozen MuJoCo visual-reaching comparison used actual `gpt-6-astra`
+responses and provider token usage. Across 12 seeds and three variants, there
+were 33 simulator-confirmed successes, zero task failures and three infrastructure
+interruptions. Shared + compact output matched baseline predictions and measured
+trajectories on all 11 valid pairs while reducing total tokens 74.7%, paired median
+episode wall time 30.5%, the sensing barrier 32.0% and summed individual perception
+wait 9.8%. Shared-only did not show equally reliable waiting-time gains. These are
+preliminary results for four simple sliders viewing discrete targets through one
+shared camera; they are not grasping or general robot-task results. See
+[the full report](SHARED_SENSING_RESULTS_20260916.md) for intervals, raw evidence,
+failure accounting, implementation boundaries and reproduction commands.
+
+Publication check for the combined changes: 165 Python tests passed with no skips;
+Ruff and whitespace checks passed. This is local verification, not a remote CI run.

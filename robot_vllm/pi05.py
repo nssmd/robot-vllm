@@ -10,7 +10,7 @@ import math
 import os
 
 from .control import Rejected
-from .protocol import ProviderError
+from .protocol import ProviderError, ProviderTimeout
 
 
 class OpenPiClient:
@@ -70,6 +70,8 @@ class OpenPiClient:
             return value
         except ProviderError:
             raise
+        except TimeoutError as exc:
+            raise ProviderTimeout("openpi_client_timeout") from exc
         except Exception as exc:
             # Upstream server errors can contain tracebacks and host paths.
             raise ProviderError("openpi_client_error:" + type(exc).__name__) from exc

@@ -10,6 +10,7 @@ multi-tenant authorization. Local Python APIs use the same runtime contracts.
 | `GET /readyz` | 200 when observations are available and restart recovery is clear; otherwise 503 |
 | `GET /health` | Resource epochs, busy/quarantined states, pending recovery and active executions |
 | `GET /metrics` | Prometheus gauges for active executions, recovery and quarantine |
+| `GET /inference` | Authenticated per-model-alias queue, capacity, transport and cancellation counters for this coordinator process |
 | `GET /tools` | Capability, topology and model-facing tool schemas |
 | `POST /tools/{name}` | Observe, execute, inspect, wait or cancel operations |
 | `POST /tasks` | Start a task using a provided DAG or configured planner |
@@ -83,5 +84,11 @@ asyncio.run(main())
 Model-serving calls and task/DAG completion remain distinct from task success.
 A task result always leaves `task_verdict` null; the independent task evaluator
 owns that verdict. Per-task model usage and phase timing accompany the result.
+Per-call `queue_time_s` and the task's `inference_queue_time_s` report admission
+waiting for dispatched calls. Model `wall_time_s` excludes admission waiting;
+after cancellation it stops at caller cancellation, while the background transport
+remains counted by `/inference` until it returns. Counters from `/inference` are
+process totals, not per-task verdicts or checkpoint-compute timing. See
+[robot-serving behavior](ROBOT_SERVING.md) for queue limits and cancellation.
 Concurrent node action times are accumulated work, so their sum may exceed wall
 time; recovery time overlaps work spent in recovery revisions.

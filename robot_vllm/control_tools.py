@@ -134,6 +134,11 @@ def create_system_app(system, *, token=None, **kwargs):
     from fastapi import HTTPException, Request
     app = create_app(system.runtime, token=token, **kwargs)
 
+    @app.get("/inference")
+    async def inference_status(request: Request):
+        app.state.authorize(request)
+        return system.inference_status()
+
     @app.post("/tasks")
     async def start_task(request: Request):
         app.state.authorize(request)

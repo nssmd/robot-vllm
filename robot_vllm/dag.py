@@ -111,6 +111,38 @@ class DAGScheduler:
         self.node_tasks = set()
         self.reservation_owners = set()
 
+    async def _propose(self, node, context, result):
+        async def observed_proposal(policy):
+            tick = time.monotonic()
+            observation = await self.runtime.observe(node.capability)
+            result["perception_time_s"] += time.monotonic() - tick
+            self.runtime.validate_observation(node.capability, observation["observation_id"])
+            return await policy.propose({**context, "observation": observation}), observation
+
+        policy = self.policies[node.policy]
+        if hasattr(policy, "admit"):
+            # Queue before sampling: queue wait must not age the action ticket.
+            async with policy.admit() as admitted:
+                return await observed_proposal(admitted)
+        return await observed_proposal(policy)
+
+    async def _proposal_until_stop(self, node, context, result, remaining):
+        work = asyncio.create_task(self._propose(node, context, result))
+        stopped = asyncio.create_task(self.stop.wait())
+        try:
+            done, _ = await asyncio.wait((work, stopped), timeout=remaining,
+                                        return_when=asyncio.FIRST_COMPLETED)
+            if stopped in done:
+                raise asyncio.CancelledError
+            if work not in done:
+                raise asyncio.TimeoutError
+            return await work
+        finally:
+            for future in (work, stopped):
+                if not future.done():
+                    future.cancel()
+            await asyncio.gather(work, stopped, return_exceptions=True)
+
     async def _execute_node(self, node, *, task_id, task, revision, predecessors):
         started = time.monotonic()
         feedback, executions = None, []
@@ -127,14 +159,11 @@ class DAGScheduler:
                 if remaining <= 0:
                     result.update(status="failed", reason="node_deadline")
                     break
-                tick = time.monotonic()
-                observation = await self.runtime.observe(node.capability)
-                result["perception_time_s"] += time.monotonic() - tick
                 context = {"schema": "robot_runtime.node_context.v1", "task_id": task_id,
                            "task": task, "node": clone(asdict(node)), "round": step,
-                           "capability": clone(asdict(cap)), "observation": observation,
+                           "capability": clone(asdict(cap)),
                            "feedback": feedback, "predecessors": predecessors}
-                proposal = await asyncio.wait_for(self.policies[node.policy].propose(context), remaining)
+                proposal, observation = await self._proposal_until_stop(node, context, result, remaining)
                 result["rounds"] += 1
                 if self.stop.is_set():
                     result.update(status="canceled", reason="dag_stopped_before_dispatch")
@@ -143,6 +172,7 @@ class DAGScheduler:
                         or proposal.observation_id != observation["observation_id"]
                         or proposal.capability != node.capability):
                     raise Rejected("policy_context_mismatch")
+                self.runtime.validate_observation(node.capability, proposal.observation_id)
                 if proposal.arguments is None:
                     if not proposal.done:
                         raise Rejected("empty_nonterminal_proposal")
@@ -190,8 +220,10 @@ class DAGScheduler:
                     await self.runtime.wait(execution_id, timeout_s=min(60, self.runtime.cancel_timeout + 0.2))
             unresolved = any(not self.runtime.executions[e].settled for e in executions)
             result.update(status="uncertain" if unresolved else "canceled", reason="dag_task_canceled")
-        except ProviderError:
-            result.update(status="infra", reason="model_provider_error")
+        except ProviderError as exc:
+            reason = str(exc) if str(exc) in ("inference_queue_full", "inference_queue_timeout",
+                                              "inference_pool_closed") else "model_provider_error"
+            result.update(status="infra", reason=reason)
         except asyncio.TimeoutError:
             result.update(status="infra", reason="policy_timeout")
         except Rejected as exc:

@@ -39,6 +39,25 @@ The server bounds concurrent predictions and request size; overload returns 429.
 It only proposes actions. The coordinator must still check the observation epoch,
 reserve resources, and dispatch through the actual robot driver.
 
+Before invoking the policy, the bridge requires JSON objects for the envelope,
+context, node, observation and observation data, plus nonempty string capability
+and observation IDs. Invalid envelopes never consume model inference. The bridge
+returns these errors without proposing actions:
+
+| HTTP status | Meaning |
+| --- | --- |
+| 401 | Missing or invalid configured bearer token |
+| 413 | Request exceeds 8 MiB |
+| 422 | Invalid request, prediction or action conversion |
+| 429 | All configured prediction slots are occupied |
+| 502 | Adapter raised `ProviderError` for an upstream failure |
+| 504 | Adapter raised `ProviderTimeout` or `TimeoutError` |
+
+Provider responses contain fixed error codes, not upstream exception text or
+tracebacks. These failures release the request's admission slot. Policy adapters
+must bound their own I/O; the generic bridge does not impose an inference deadline
+or automatically retry. An HTTP failure does not establish a robot-task verdict.
+
 A terminal policy prediction may return `actions: null, done: true`; a nonterminal
 empty prediction is rejected. The response echoes the request observation ticket,
 capability and model identity. No tokenizer usage is fabricated for a VLA without

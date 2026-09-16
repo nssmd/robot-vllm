@@ -282,6 +282,24 @@ class DeviceRuntime:
             self.journal.emit("observation", observation=record)
             return clone(record)
 
+    def validate_observation(self, capability, observation_id):
+        """Check a ticket on the coordinator loop, including terminal no-op decisions."""
+        if self.closing:
+            raise Rejected("runtime_closing")
+        if capability not in self.capabilities:
+            raise Rejected("unknown_capability")
+        cap, _ = self.capabilities[capability]
+        observation = self.observations.get(observation_id)
+        if not observation or observation["capability"] != capability:
+            raise Rejected("unknown_or_wrong_observation")
+        if time.monotonic() - observation["captured_at"] > self.ttl:
+            raise Rejected("expired_observation")
+        if any(r in self.occupied for r in cap.resources):
+            raise Rejected("resource_busy")
+        if not observation["can_dispatch"] or any(
+                self.epochs[r] != observation["epochs"][r] for r in cap.resources):
+            raise Rejected("stale_control_context")
+
     async def submit(self, *, owner: str, request_id: str, capability: str,
                      observation_id: str, arguments: dict, timeout_s: float | None = None):
         if not isinstance(owner, str) or not owner or not isinstance(request_id, str) or not request_id:
@@ -318,16 +336,8 @@ class DeviceRuntime:
             duration = cap.max_duration_s if timeout_s is None else timeout_s
             if type(duration) not in (int, float) or not 0 < duration <= cap.max_duration_s:
                 raise Rejected("invalid_execution_timeout")
-            observation = self.observations.get(observation_id)
-            if not observation or observation["capability"] != capability:
-                raise Rejected("unknown_or_wrong_observation")
-            if time.monotonic() - observation["captured_at"] > self.ttl:
-                raise Rejected("expired_observation")
-            if any(r in self.occupied for r in cap.resources):
-                raise Rejected("resource_busy")
-            if not observation["can_dispatch"] or any(
-                    self.epochs[r] != observation["epochs"][r] for r in cap.resources):
-                raise Rejected("stale_control_context")
+            self.validate_observation(capability, observation_id)
+            observation = self.observations[observation_id]
             execution_id = uuid.uuid4().hex
             item = Execution(execution_id, owner, cap, body["arguments"], duration,
                              observation["captured_at"] + self.ttl)

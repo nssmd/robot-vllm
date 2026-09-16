@@ -127,3 +127,25 @@ def test_replanning_cannot_modify_completed_nodes(tmp_path):
         log.close()
         await rt.close()
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("arguments", [None, {"target": .2, "steps": 1}])
+def test_expired_model_result_cannot_move_or_finish_subtask(tmp_path, arguments):
+    async def scenario():
+        rt, arms = setup(tmp_path)
+        class SlowPolicy:
+            async def propose(self, context):
+                ticket = context["observation"]["observation_id"]
+                rt.observations[ticket]["captured_at"] -= rt.ttl + 1
+                return NodeProposal(ticket, "a.move", arguments, True)
+        policies = {"slow": SlowPolicy()}
+        checked = TaskPlan.parse(plan(node("stale", policy="slow")), rt, policies)
+        journal = Journal(tmp_path / "stale.jsonl")
+        result = await DAGScheduler(rt, policies, journal).run(checked, task_id="stale", task="move")
+        assert result["status"] == "failed"
+        assert result["nodes"]["stale"]["reason"] == "expired_observation"
+        assert not any(a.started for a in arms.values())
+        assert not rt.policy_reservations
+        journal.close()
+        await rt.close()
+    asyncio.run(scenario())

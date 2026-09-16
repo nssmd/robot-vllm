@@ -1,44 +1,80 @@
 # Robot-vLLM
 
-**GPT-6 负责 Planner 和 DAG 编排，π₀.₅（Pi 0.5）作为 VLA，ROS 2 负责机器人之间的消息、服务与动作执行。**
+**连接 GPT、VLA 与机器人的运行时，统一管理感知、推理调度、指令执行和恢复。**
 
-仓库 / Python 包名：`robot-vllm`。命令行：`robot-runtime`。
+机器人会在模型推理期间继续变化，多台机器人也可能重复处理同一画面。
+Robot-vLLM 管理这条链路：让任务共享推理容量，按时采集观测，校验返回指令是否仍然有效，
+再通过 ROS 2 或设备插件执行。它提供显式共享感知服务，供需要复用场景信息的应用接入。
 
-Pi 0.5 接入使用 Physical Intelligence 官方 [OpenPI](https://github.com/Physical-Intelligence/openpi) 的
-[`openpi-client`](https://github.com/Physical-Intelligence/openpi/tree/main/packages/openpi-client) 第三方库。
-本项目直接调用官方 `WebsocketClientPolicy.infer()`；没有另外实现一套 Pi 0.5 通信协议。
+当前支持 GPT-6 Planner、官方 OpenPI π₀.₅ 客户端、代码策略，以及 ROS 2 的相机、
+关节状态、机械臂/夹爪动作与服务调用。适合开发多机器人应用、接入模型策略和研究感知/执行效率。
 
-## 能体验什么
+[快速体验](#快速体验) · [实测结果](#实测结果) · [简单任务](#简单任务) · [安装与部署](docs/QUICKSTART_DEPLOYMENT.md) · [API](docs/api.md)
 
-- 输入任务，由 GPT-6 生成 DAG：哪些机器人并行工作、哪些步骤需要等待、何时调用服务。
-- 把相机、关节和夹爪状态送到 OpenPI 的 π₀.₅-DROID 服务，消费模型返回的动作块。
-- 同一套执行器支持代码策略、GPT-6 策略和 Pi 0.5 策略；模型不直接绕过执行器控制硬件。
-- 通过 ROS 2 Topics 接收状态/相机，通过 Actions 执行机械臂和夹爪动作，通过 Services 调用功能。
-- 多机资源互斥、联动取消、断联隔离、重启后的原始动作结果确认，以及 DAG 已完成节点保护。
+> **开发状态：** `main` 分支包含以下共享感知、推理调度与实验代码，尚未打新版本标签。
+> v0.5.0 标签提供 OpenPI 接入与 ROS 2 快速体验。真实 π₀.₅ 权重的操作效果尚未验证。
 
-```mermaid
-flowchart TD
-    Task[用户任务 / HTTP API] --> GPT[GPT-6 Planner]
-    GPT --> DAG[DAG 校验、并行调度与失败修复]
-    DAG --> Code[代码策略 / 服务调用]
-    DAG --> VLA[Pi 0.5 VLA 适配]
-    VLA --> Client[官方 openpi-client]
-    Client --> OpenPI[GPU 主机上的 OpenPI π0.5 服务]
-    OpenPI --> Codec[动作空间映射]
-    Code --> Runtime[资源管理与持久化执行]
-    Codec --> Runtime
-    Runtime --> ROS[ROS 2 Topics / Services / Actions]
-    ROS --> A[机器人主机 A]
-    ROS --> B[机器人主机 B]
-    A --> State[关节、夹爪、相机和执行反馈]
-    B --> State
-    State --> VLA
-    State --> GPT
-```
+## 架构
 
-## 1. 先运行一个不需要 GPU 的完整体验
+![Robot-vLLM 架构：应用与 GPT Planner 生成任务，Runtime 管理推理、观测、校验和执行，通过 ROS 2 连接机器人；共享感知服务显式接入。](docs/assets/architecture.png)
 
-需要 Linux、Git 和 Python 3.10–3.12（推荐 3.12；官方客户端目前依赖 NumPy < 2）。这条命令会启动并收尾所有体验进程，不需要模型 Key 或 ROS。
+[矢量图 SVG](docs/assets/architecture.svg) · [可编辑 PowerPoint](docs/assets/architecture.pptx) · [详细架构与执行语义](docs/architecture.md)
+
+| 组件 | 具体解决什么问题 |
+| --- | --- |
+| 任务与 DAG | 验证依赖，运行独立分支；修订任务时保留已完成节点 |
+| 共享推理队列 | 每个模型别名跨任务共享并发与排队上限；取消后仍运行的 HTTP 请求继续占用容量 |
+| 观测与指令校验 | 获得推理名额后采样；动作和终止决策都检查原始观测票据与有效期 |
+| 共享感知服务 | 合并同源、同帧、同问题的感知请求；支持版本失效、有效期与有界缓存 |
+| 设备执行与恢复 | 资源互斥、组动作、取消结果确认、持久化和原始 ROS goal ID 恢复 |
+| 计量 | 记录模型 token、队列等待、调用耗时；通过 `/inference` 查询容量和取消计数 |
+
+共享感知目前由应用显式接入，并在下述独立实验中验证；尚未自动应用于所有 ROS 驱动。
+跨视角对齐与自动场景变化检测仍需实现。模型服务承担实际推理，机器人控制器承担实时控制。
+
+## 实测结果
+
+**真实 GPT-6 + MuJoCo，共享感知与紧凑输出在简单视觉到达任务上降低了开销。**
+
+四个独立滑块从同一张相机图像识别各自颜色目标所在列，移动到对应位置；随后目标变化，再执行一轮。
+基线允许四个模型请求同时运行。三组使用相同模型、相同初始状态和控制器，并轮换执行顺序。
+
+| 每回合指标 | 独立感知 | 共享感知 | 共享感知 + 紧凑输出 |
+| --- | ---: | ---: | ---: |
+| 实际模型调用 | 8 | 2 | 2 |
+| 实际总 token | 3,464 | 938 | **876（−74.7%）** |
+| 配对任务耗时变化 | 基线 | −6.3% | **−30.5%** |
+| 配对汇合前感知等待变化 | 基线 | −7.0% | **−32.0%** |
+| 配对各机器人感知等待之和变化 | 基线 | **+14.5%** | **−9.8%** |
+
+**质量与统计口径：** 12 个冻结种子 × 3 组，共 33 个最终仿真成功、0 个任务失败、
+3 个基础设施中断；每组均为 11/11 个有效回合成功，中断保留且不计入分母。
+共享加紧凑输出与基线的 **11 对有效样本，目标判断和记录的最终运动轨迹全部一致**。
+共享组与基线有 10 对有效样本。token 来自供应商返回的 usage；耗时变化是逐种子配对降幅的中位数。
+
+这是**初步的简单任务结果**，不代表复杂抓取、跨视角协作或实物机器人性能。
+仅共享感知的耗时区间包含无改善，且个体等待可能增加；本实验中紧凑输出组合效果更稳定。
+仿真按固定步数推进，未按实物时间节奏运行。详见[完整结果、区间与限制](docs/SHARED_SENSING_RESULTS_20260916.md)。
+
+## 简单任务
+
+| 任务 | 可以看到什么 | 验证范围 |
+| --- | --- | --- |
+| 两机器人策略与服务汇合 | 两台机器人各执行两轮 π₀.₅ 协议调用，完成后调用一次场景服务 | 默认模型和设备为示例；官方客户端真实运行，可切换真实 ROS 2 通信 |
+| 四机器人视觉到达 | GPT-6 看共享顶视图，四个滑块移动到各自颜色目标列；目标变化后重新感知 | 真实模型调用、MuJoCo 动力学、执行后独立裁决；上表对应此任务 |
+| 协调器崩溃恢复 | 两个 MuJoCo 控制器在协调器退出后保持，重启后查询原始动作结果 | 验证隔离与不重复执行；不是操作任务成功率 |
+
+视觉到达任务示例：**“红、绿、蓝、黄四个滑块分别移动到对应颜色圆盘所在列。”**
+模型只看图像与公开的网格列编号，仿真器目标坐标仅用于执行后的判定。
+这项任务检验共享感知、输出压缩和目标更新，不包含抓取或接触操作。
+
+![简单视觉到达任务：左为模型收到的顶视图，右为执行后的图像，四个黑色滑块已到达对应颜色目标列。](docs/assets/simple-task.png)
+
+上图来自冻结种子 1201 的共享加紧凑输出组、第一阶段；图像为实际保留的 MuJoCo 渲染结果。
+
+## 快速体验
+
+需要 Linux、Git、Python 3.10–3.12（推荐 3.12）。默认体验无需 GPU、模型 Key 或 ROS：
 
 ```bash
 git clone https://github.com/nssmd/robot-vllm.git
@@ -50,9 +86,7 @@ python -m pip install -e '.[pi05]'
 robot-runtime quickstart
 ```
 
-`[pi05]` 安装的是官方 OpenPI 仓库中的客户端子包，固定到已核对的 commit；不会安装训练框架或下载模型权重。
-
-预期输出：
+`[pi05]` 安装固定版本的官方 `openpi-client`，不下载模型权重。预期输出：
 
 ```text
 Robot-vLLM quickstart
@@ -64,226 +98,72 @@ Transport: in-process synthetic robot drivers
 Evidence: runs/quickstart/<run-id>/quickstart.json
 ```
 
-这个例子做了什么：
+两个并行节点的打印顺序可能不同。默认模型响应和机器人观测均为明确标识的示例，
+用于体验完整链路；`completed` 表示节点执行完成，不等于抓取成功。
 
-1. GPT-6 API 的确定性示例服务返回三节点 DAG。
-2. 两台示例机器人并行执行，各调用两次 VLA；这里确实使用官方 OpenPI 客户端传输 NumPy 观测和动作。
-3. 收到 `(10, 8)` 的 DROID 形式动作块，按显式映射执行短前缀，然后重新观测。
-4. 两个分支完成后，调用一次场景服务并消费返回值。
-5. 输出每个节点的状态，并保留配置、任务图、执行事件和结果。
-
-**这一级使用示例模型响应和合成机器人/图像，没有加载真实 GPT-6 或 π₀.₅ 权重。**
-它让你先确认安装、官方客户端、DAG、VLA 适配和服务调用能一起工作。真实模型见第 3 节。
-
-只想看四臂并行调度，也可以运行：
+已经安装 ROS 2 Jazzy 时，在兼容的 Python 3.12 环境中运行：
 
 ```bash
-robot-runtime demo --arms 4
-```
-
-## 2. 用真实 ROS 2 通信运行同一个体验
-
-下面以已安装 ROS 2 Jazzy 的 Ubuntu 24.04 为例。Jazzy 需要 Python 3.12；使用系统 Python 创建独立环境，保留 ROS 的系统依赖。
-
-```bash
-sudo apt-get install -y python3-venv ros-jazzy-control-msgs ros-jazzy-sensor-msgs ros-jazzy-std-srvs
 source /opt/ros/jazzy/setup.bash
-/usr/bin/python3 -m venv --system-site-packages .venv-ros
-source .venv-ros/bin/activate
-python -m pip install -e '.[pi05]'
 ROS_DOMAIN_ID=191 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
   robot-runtime quickstart --transport ros2
 ```
 
-仍会出现三个 `completed` 节点，但通信层变为：
+详见[ROS 依赖与虚拟环境安装](docs/QUICKSTART_DEPLOYMENT.md#2-用真实-ros-2-通信运行同一个体验)。
+该模式启动两个独立示例控制器，实际使用 ROS Topics、机械臂/夹爪 Actions 和 Trigger Service。
 
-```text
-Transport: real ROS 2 topics, actions and service; synthetic robots
-```
+## 复现共享感知实验
 
-这次启动两个独立 ROS 控制器进程，每个包含 7 关节机械臂、夹爪和两路合成相机。
-它使用真实 ROS 消息传输和原生 action/service 返回值；机械臂状态是示例控制器状态，不是实物或任务物理仿真。
-这是同机多进程体验。**分布到不同主机的配置见第 4 节。**
-
-| ROS 2 机制 | 本项目如何使用 | 谁消费信息 |
-| --- | --- | --- |
-| Topics / pub-sub | `sensor_msgs/JointState`、`sensor_msgs/Image` 持续发布 | 适配器订阅，组成带时效的观测供 Pi 0.5 / GPT-6 使用 |
-| Actions | `FollowJointTrajectory`、`GripperCommand`，包含目标、反馈、取消与终止结果 | 执行器跟踪状态；DAG 等待依赖完成 |
-| Services | `std_srvs/Trigger` 请求/响应，例如扫描、设备准备等已注册功能 | 代码节点或 Planner 指定的节点调用，并读取 `success/message` |
-| 应用层资源管理 | 同一组机器的占用、隔离、执行上下文和恢复 | Runtime 统一管理，避免策略争抢同一执行资源 |
-
-ROS 2 提供通信原语；任务图、消费顺序、重试边界和跨机器人资源协调由 Runtime 实现。
-
-## 3. 接入真实 π₀.₅ 和 GPT-6
-
-### GPU 主机：启动官方 OpenPI π₀.₅-DROID 服务
-
-在独立模型环境中，按 [OpenPI 官方安装说明](https://github.com/Physical-Intelligence/openpi#installation) 安装完整 OpenPI。
-官方说明推理需要 NVIDIA GPU，具体显存要求以其版本和 checkpoint 为准。
+需要真实的 Responses API 模型端点和可用的 MuJoCo 渲染环境；以下命令会产生模型调用费用。
+脚本位于当前开发版本中。
 
 ```bash
-git clone --recurse-submodules https://github.com/Physical-Intelligence/openpi.git
-cd openpi
-git checkout 215abfb217dbac7d5f1273282331b9b1866c0479
-GIT_LFS_SKIP_SMUDGE=1 uv sync
-GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
-uv run scripts/serve_policy.py --port=8000 policy:checkpoint \
-  --policy.config=pi05_droid \
-  --policy.dir=gs://openpi-assets/checkpoints/pi05_droid
-```
-
-这条命令会加载真实权重。也可以把 `--policy.dir` 换成已有的本地 checkpoint。
-这里明确选择 **π₀.₅-DROID**；LIBERO、ALOHA 或自训练 checkpoint 的观测与动作约定不同，不能直接混用此映射。
-
-### Runtime 主机：先用合成机器人检查真实模型服务
-
-```bash
-export OPENPI_URI='ws://YOUR_GPU_HOST:8000'
+python -m pip install -e '.[simulation]'
 export GP6_ENDPOINT='https://YOUR_GATEWAY/v1/responses'
 export GP6_API_KEY='YOUR_KEY'
-export GP6_MODEL='gpt-6-astra'  # 替换为网关实际支持的模型 ID
-robot-runtime quickstart --real-models
+xvfb-run -a env MUJOCO_GL=glfw python scripts/sensing_benchmark.py \
+  --model gpt-6-astra --concurrency 4 \
+  --seeds 1201 1202 1203 1204 1205 1206 1207 1208 1209 1210 1211 1212 \
+  --output runs/my-sensing-comparison
+python scripts/analyze_sensing.py runs/my-sensing-comparison
 ```
 
-此时 GPT-6 和 OpenPI 调用走你提供的真实服务；机器人与图像仍是合成体验环境。
-这可以检查推理链路，但不能用来评判模型是否会抓取物体。要同时检查 ROS：
+`xvfb-run` 需要系统安装 Xvfb/xauth，具体环境见[实验说明](docs/SHARED_SENSING.md)。
+实验保留配置与源码快照、模型请求和响应、图像、运动轨迹及最终裁决；使用同一输出目录
+可跳过已完成记录。端点必须支持所指定的模型和结构化输出，基础设施错误单列。
 
-```bash
-source /opt/ros/jazzy/setup.bash
-ROS_DOMAIN_ID=191 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
-  robot-runtime quickstart --transport ros2 --real-models
-```
+## 接入自己的模型与机器人
 
-`--real-models` 不会悄悄回退到示例模型。端点、认证、超时或动作约定错误会明确报错。
+- **GPT / VLM：** 配置 OpenAI-compatible Responses 或 Chat Completions 端点，用于规划与节点策略。
+- **π₀.₅：** 通过官方 OpenPI `WebsocketClientPolicy.infer()` 接入；DROID 映射显式声明相机、关节、速度缩放与夹爪单位。
+- **ROS 2：** 支持 `JointState`、`Image`、`FollowJointTrajectory`、`GripperCommand` 和 `Trigger`。
+- **设备扩展：** 用插件提供观测、参数验证与执行契约；持久化恢复还需要原生动作定位与结果查询。
 
-### 用正式配置连接机器人
+[真实 GPT-6 / OpenPI 配置](docs/QUICKSTART_DEPLOYMENT.md) ·
+[多主机部署](docs/QUICKSTART_DEPLOYMENT.md#4-分布到多台机器) ·
+[API 与 Python 示例](docs/api.md) · [VLA 扩展](docs/vla.md)
 
-先检查并修改两个文件：
+## 本版本具体做了什么
 
-- [`configs/pi05.droid.json`](configs/pi05.droid.json)：每台机器的相机名称、7 个关节顺序、关节限制、速度缩放、夹爪标定。
-- [`configs/system.pi05.ros2.json`](configs/system.pi05.ros2.json)：ROS Topics/Actions/Services、机器人分组和 GPT-6/Pi 0.5 模型服务。
+1. **推理调度：** 新增共享 FIFO 队列，限制并发、排队和等待时间；任务取消后丢弃迟到结果，后台传输结束前保留占用。
+2. **时效检查：** 将观测采集放到推理名额之后；过期结果既不能发动作，也不能直接宣布子任务结束。
+3. **共享感知：** 实现同帧同问题的请求合并、有界缓存、多订阅者隔离，以及场景版本变化和超龄失效。
+4. **实测对照：** 新增独立/共享/共享加紧凑输出三组 MuJoCo 实验，使用真实 GPT-6 与供应商 token 计量，记录配对耗时和两种等待指标。
+5. **接口可靠性：** 补齐 VLA 请求校验与 502/504 故障分类，修复旧版 FastAPI 环境中的请求体处理兼容性，增加取消、失效和容量回归检查。
 
-这些文件的默认数值面向示例控制器。接硬件时必须替换为实际控制器约定。
+以上工作基于已有 DAG、官方 OpenPI 集成、ROS 2 适配器、资源预约与 SQLite 恢复机制。
+逐项记录见 [CHANGELOG](CHANGELOG.md) 与[验证文档](docs/validation.md)。
 
-**π₀.₅-DROID 输出的前 7 维是关节速度输入，第 8 维是夹爪位置输入；它们不是 8 个关节角。**
-适配层按显式的 `velocity_scale_rad_s × step_s` 转换短前缀到机械臂位置轨迹，夹爪独立使用米/牛顿单位。
-DROID 官方示例会裁剪速度并二值化夹爪；配置里的 `clip_normalized_velocity` 明确控制裁剪。
-夹爪状态切换处会截断当前前缀，执行后重新观测。该位置控制转换需要在目标控制器上验证，不能等同于原生 DROID 速度控制性能。
+## 文档与验证
 
-终端 A，启动桥接服务；它直接调用官方 `openpi-client`：
-
-```bash
-export OPENPI_URI='ws://YOUR_GPU_HOST:8000'
-export PI05_BRIDGE_TOKEN='choose-a-local-bridge-token'
-robot-runtime-pi05 --config configs/pi05.droid.json --port 8766
-```
-
-终端 B，设置服务地址并运行任务：
-
-```bash
-source /opt/ros/jazzy/setup.bash
-export PI05_BRIDGE_ENDPOINT='http://127.0.0.1:8766/predict'
-export PI05_BRIDGE_TOKEN='choose-a-local-bridge-token'
-export GP6_ENDPOINT='https://YOUR_GATEWAY/v1/responses'
-export GP6_API_KEY='YOUR_KEY'
-robot-runtime validate-config --config configs/system.pi05.ros2.json
-robot-runtime run --config configs/system.pi05.ros2.json \
-  --task '让 robot_1 和 robot_2 各执行两轮 Pi 0.5 策略，然后调用 scene.trigger。'
-```
-
-这里 GPT-6 担任 Planner：生成 DAG、选已注册的能力、安排依赖；执行失败且设备状态已确认后，可以修复未完成部分。
-Pi 0.5 执行具体 VLA 节点。`max_rounds` 是动作块预算，Pi 0.5 并不因此获得任务成功判定能力。
-
-也可先用已写好的 DAG 检查 Pi 0.5 与机器人连接：
-
-```bash
-robot-runtime run --config configs/system.pi05.ros2.json \
-  --plan configs/dag.pi05.example.json --task '执行已声明的两机策略流程'
-```
-
-## 4. 分布到多台机器
-
-建议分工：协调主机运行 GPT-6 网关接入、Pi 0.5 桥接和 Runtime；GPU 主机运行 OpenPI；机器人主机各运行自己的 ROS 控制器。
-只要 Topic/Action/Service 名称与配置相符，控制器可以位于不同主机。
-
-附带显式 Zenoh 路由配置，适合不依赖跨网段 DDS 自动发现的部署。各 ROS 主机安装：
-
-```bash
-sudo apt-get install -y ros-jazzy-rmw-zenoh-cpp
-```
-
-协调主机启动路由器：
-
-```bash
-source /opt/ros/jazzy/setup.bash
-export ROS_DOMAIN_ID=191
-export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-ZENOH_ROUTER_CONFIG_URI="$PWD/configs/zenoh/router.json5" \
-  ros2 run rmw_zenoh_cpp rmw_zenohd
-```
-
-机器人主机把 `configs/zenoh/robot.json5` 中的 `COORDINATOR_IP` 改为路由主机地址，然后设置：
-
-```bash
-source /opt/ros/jazzy/setup.bash
-export ROS_DOMAIN_ID=191
-export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-export ZENOH_SESSION_CONFIG_URI="$PWD/configs/zenoh/robot.json5"
-```
-
-没有硬件时，可以分别在主机 A/B 启动以下示例控制器；`--namespace` 分别用 `/robot_1`、`/robot_2`：
-
-```bash
-python -m robot_vllm.ros_validation controller \
-  --namespace /robot_1 --joints 7 --with-gripper --ready runs/robot-1.ready.json
-```
-
-协调主机运行 Runtime 的终端设置 `ZENOH_SESSION_CONFIG_URI="$PWD/configs/zenoh/coordinator.json5"`，
-以及同样的 `ROS_DOMAIN_ID`、`RMW_IMPLEMENTATION`，然后使用第 3 节的配置启动任务。
-所有主机使用可达的可信 ROS 网络；这些心跳和路由配置不提供身份认证或物理同步保证。
-
-已有跨主机故障验证工具：
-
-```bash
-python -m robot_vllm.crosshost_validation --help
-```
-
-它要求独立实验容器，支持切断指定 ROS 链路、检查联动取消与资源隔离；不会启动训练或大批任务评测。
-
-## 5. 让应用调用 Runtime
-
-服务模式默认启用 SQLite 持久化。同一状态目录只能由一个协调进程使用。
-
-```bash
-export ROBOT_RUNTIME_TOKEN='choose-an-api-token'
-robot-runtime serve --config configs/system.pi05.ros2.json --state-dir state/cell-a
-```
-
-提交任务：
-
-```bash
-curl -s http://127.0.0.1:8765/tasks \
-  -H "Authorization: Bearer $ROBOT_RUNTIME_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"request_id":"application-task-001","task":"两台机器各执行两轮策略，然后调用场景服务"}'
-```
-
-返回 `task_id` 后，用 `GET /tasks/{task_id}` 查询、`POST /tasks/{task_id}/cancel` 取消。
-重复使用相同 `request_id` 和内容会返回同一任务，重启后也不会重新创建。
-其他入口：`/tools`、`/health`、`/readyz`、`/metrics`、`/recovery`。完整约定见 [API 文档](docs/api.md)。
-
-## 当前验证范围
-
-| 项目 | 状态 |
+| 文档 | 内容 |
 | --- | --- |
-| 官方 OpenPI 客户端第三方依赖、原生 `infer()` 调用、DROID 图像/状态/动作映射 | 已实现并测试 |
-| 无 ROS 快速体验、ROS 2 两机器人/夹爪/服务快速体验 | 已实际跑通，模型响应和机器人是明确标识的示例 |
-| 跨真实主机的 ROS 协调、断联恢复 | 之前已在两台主机与独立 MuJoCo 模型上验证 |
-| 协调器进程崩溃、持久化隔离、原始 ROS goal ID 恢复 | 已验证 |
-| 真实 GPT-6 | 之前已跑通一次跨主机 DAG；其记录与示例响应分开 |
-| 真实 π₀.₅ 权重驱动的实物/共享物体协作 | 尚未验证，不把客户端接入当作模型任务成绩 |
-
-源码检查与测试：
+| [安装与部署](docs/QUICKSTART_DEPLOYMENT.md) | 完整体验、真实模型、ROS 2 与 Zenoh 多主机配置 |
+| [框架设计](docs/ROBOT_SERVING.md) | 调度、观测、执行和演进方向 |
+| [共享感知接口](docs/SHARED_SENSING.md) | 身份、失效、订阅、实验定义 |
+| [实验结果](docs/SHARED_SENSING_RESULTS_20260916.md) | 实际 token、配对统计、失败与限制 |
+| [文献阅读](docs/SENSING_RESEARCH_20260916.md) | vLLM、机器人服务和协作感知的对照 |
+| [恢复与部署语义](docs/deployment.md) | 取消、持久化、隔离和恢复 |
 
 ```bash
 python -m pip install -e '.[pi05,test]' ruff
@@ -291,11 +171,10 @@ python -m pytest -q
 ruff check robot_vllm tests scripts examples
 ```
 
-自动 GitHub CI 目前因发布凭据缺少 `workflow` 权限而未启用；[完整模板](.github/ci-tests.yml)和[启用步骤](docs/ci.md)已提供。
+本地测试与真实 ROS 通信验证记录见[验证文档](docs/validation.md)。GitHub 自动 CI 尚未启用，
+[模板](.github/ci-tests.yml)和[启用步骤](docs/ci.md)已提供；不以未运行的 CI 作为验证依据。
 
-进一步阅读：[架构](docs/architecture.md) · [部署与恢复](docs/deployment.md) · [Pi 0.5 接入细节](docs/pi05.md) ·
-[VLA 扩展](docs/vla.md) · [验证记录](docs/validation.md) · [贡献指南](CONTRIBUTING.md)。
+运动规划、碰撞规避、标定、力控和急停由目标机器人系统负责。真实 π₀.₅ 权重驱动的
+共享物体操作尚未验证。框架执行完成与最终任务成功分别记录。
 
-硬件运动规划、碰撞规避、坐标标定、力控和急停由相应机器人系统负责。
-框架的 DAG/action 完成不等于独立仿真或真实任务成功。
-许可证：[Apache-2.0](LICENSE)。OpenPI 是独立的第三方项目，其代码、模型及使用条件以官方仓库为准。
+许可证：[Apache-2.0](LICENSE)。OpenPI 的代码、模型和使用条件以[官方项目](https://github.com/Physical-Intelligence/openpi)为准。

@@ -18,7 +18,7 @@ def code_node(name, target=0.2, steps=1, **kw):
 
 
 def test_gp6_replans_only_unfinished_work(monkeypatch, tmp_path):
-    async def generate(self, *, instruction, context, role, meter):
+    async def generate(self, *, instruction, context, role, meter, admission=None):
         if role == "planner":
             complete = context["completed"]
             if complete:

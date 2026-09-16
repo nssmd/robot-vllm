@@ -5,7 +5,7 @@ import pytest
 
 from robot_vllm.control import Rejected
 from robot_vllm.pi05 import DroidMapping, OpenPiClient
-from robot_vllm.protocol import ProviderError
+from robot_vllm.protocol import ProviderTimeout
 from robot_vllm.testing.pi05_devices import fixture_image
 
 
@@ -91,14 +91,31 @@ def test_official_openpi_client_is_invoked_over_websocket(monkeypatch):
     asyncio.run(scenario())
 
 
-def test_native_client_timeout_is_bounded():
+@pytest.mark.parametrize("send_metadata", [False, True])
+def test_native_client_timeout_is_bounded_and_next_call_recovers(send_metadata):
     pytest.importorskip("openpi_client")
+    from openpi_client import msgpack_numpy
     from websockets.asyncio.server import serve
     async def scenario():
+        attempts = 0
         async def handler(ws):
-            await ws.wait_closed()  # No metadata frame: constructor must not wait forever.
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                if send_metadata:
+                    await ws.send(msgpack_numpy.packb({"fixture": True}))
+                    await ws.recv()
+                await ws.wait_closed()
+                return
+            await ws.send(msgpack_numpy.packb({"fixture": True}))
+            await ws.recv()
+            await ws.send(msgpack_numpy.packb({"actions": np.zeros((1, 8))}))
         async with serve(handler, "127.0.0.1", 0) as server:
             client = OpenPiClient(f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}", timeout_s=.1)
-            with pytest.raises(ProviderError, match="openpi_client_error"):
+            with pytest.raises(ProviderTimeout, match="openpi_client_timeout"):
                 await asyncio.wait_for(client.infer({}), timeout=2)
+            assert client.metadata is None
+            result = await client.infer({})
+            assert result["actions"].shape == (1, 8)
+            assert attempts == 2
     asyncio.run(scenario())

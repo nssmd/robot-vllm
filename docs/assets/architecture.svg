@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820"><rect width="1200" height="820" fill="#f5f7fa"/>
+<text x="42" y="58" font-family="WenQuanYi Micro Hei, sans-serif" font-size="34" fill="#172c44">Robot-vLLM</text>
+<text x="42" y="93" font-family="WenQuanYi Micro Hei, sans-serif" font-size="23" fill="#4b6176">连接模型与机器人：推理调度 → 新鲜观测 → 校验与执行</text>
+<rect x="42" y="125" width="335" height="110" rx="15" fill="#edf3fa" stroke="#ced8e3" stroke-width="2"/>
+<text x="62" y="164" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">应用 / 用户任务</text>
+<text x="62" y="197" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">HTTP API · 任务 ID · 取消</text>
+<rect x="432" y="125" width="350" height="110" rx="15" fill="#edf3fa" stroke="#ced8e3" stroke-width="2"/>
+<text x="452" y="164" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">GPT-6 Planner</text>
+<text x="452" y="197" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">生成 DAG · 分配能力 · 安排依赖</text>
+<rect x="838" y="125" width="320" height="110" rx="15" fill="#edf3fa" stroke="#ced8e3" stroke-width="2"/>
+<text x="858" y="164" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">模型服务</text>
+<text x="858" y="197" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">GPT / OpenPI Pi 0.5</text>
+<path d="M377 178 L430 178" stroke="#55748c" stroke-width="3"/><polygon points="430,178 420.3465918192059,183.27368092464624 420.3465918192059,172.72631907535376" fill="#55748c"/>
+<path d="M782 178 L836 178" stroke="#55748c" stroke-width="3"/><polygon points="836,178 826.3465918192059,183.27368092464624 826.3465918192059,172.72631907535376" fill="#55748c"/>
+<rect x="42" y="275" width="1116" height="205" rx="15" fill="#eaf5f3" stroke="#258879" stroke-width="2"/>
+<text x="62" y="314" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">Robot-vLLM Runtime</text>
+<rect x="62" y="338" width="325" height="117" rx="15" fill="#ffffff" stroke="#9bc9bf" stroke-width="2"/>
+<text x="82" y="377" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">01  推理与观测</text>
+<text x="82" y="410" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">跨任务共享队列 · 有界并发</text>
+<text x="82" y="437" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">获得名额后采样</text>
+<rect x="437" y="338" width="325" height="117" rx="15" fill="#ffffff" stroke="#9bc9bf" stroke-width="2"/>
+<text x="457" y="377" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">02  指令校验</text>
+<text x="457" y="410" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">能力参数 · 原始观测票据</text>
+<text x="457" y="437" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">拒绝过期与迟到结果</text>
+<rect x="812" y="338" width="325" height="117" rx="15" fill="#ffffff" stroke="#9bc9bf" stroke-width="2"/>
+<text x="832" y="377" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">03  执行与恢复</text>
+<text x="832" y="410" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">资源预约 · 原生取消确认</text>
+<text x="832" y="437" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">持久化 · 重启后查询动作</text>
+<path d="M608 235 L608 273" stroke="#55748c" stroke-width="3"/><polygon points="608,273 602.7263190753538,263.3465918192059 613.2736809246462,263.3465918192059" fill="#55748c"/>
+<path d="M999 235 L999 273" stroke="#55748c" stroke-width="3"/><polygon points="999,273 993.7263190753538,263.3465918192059 1004.2736809246462,263.3465918192059" fill="#55748c"/>
+<path d="M387 394 L435 394" stroke="#55748c" stroke-width="3"/><polygon points="435,394 425.3465918192059,399.2736809246462 425.3465918192059,388.7263190753538" fill="#55748c"/>
+<path d="M762 394 L810 394" stroke="#55748c" stroke-width="3"/><polygon points="810,394 800.3465918192059,399.2736809246462 800.3465918192059,388.7263190753538" fill="#55748c"/>
+<rect x="42" y="524" width="700" height="116" rx="15" fill="#ffffff" stroke="#ced8e3" stroke-width="2"/>
+<text x="62" y="563" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">ROS 2 / 设备适配器</text>
+<text x="62" y="596" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">Topics：相机与状态     Actions：机械臂与夹爪</text>
+<text x="62" y="623" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">Services：扫描等功能      →      多机器人 / 仿真</text>
+<path d="M610 480 L610 522" stroke="#55748c" stroke-width="3"/><polygon points="610,522 604.7263190753538,512.3465918192059 615.2736809246462,512.3465918192059" fill="#55748c"/>
+<rect x="782" y="524" width="376" height="116" rx="15" fill="#fff5e6" stroke="#b88842" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="802" y="563" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">共享感知服务  ·  显式接入</text>
+<text x="802" y="596" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">同帧同问题合并 · 多方订阅</text>
+<text x="802" y="623" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">场景变化 / 超龄 → 旧结果失效</text>
+<path d="M1100 524 L1100 482" stroke="#b88842" stroke-width="3"/><polygon points="1100,482 1105.2736809246462,491.6534081807941 1094.7263190753538,491.6534081807941" fill="#b88842"/>
+<text x="786" y="663" font-family="WenQuanYi Micro Hei, sans-serif" font-size="15" fill="#795b30">已由独立对照验证；未自动接入全部 ROS 驱动</text>
+<rect x="42" y="700" width="1116" height="85" rx="15" fill="#ffffff" stroke="#ced8e3" stroke-width="2"/>
+<text x="62" y="739" font-family="WenQuanYi Micro Hei, sans-serif" font-size="24" fill="#172c44">简单任务：同一顶视相机下，四个滑块移动到各自颜色目标所在列</text>
+<text x="63" y="765" font-family="WenQuanYi Micro Hei, sans-serif" font-size="18" fill="#4b6176">真实 GPT-6 识图 → 公开网格映射 → MuJoCo 执行 → 执行后独立裁决；不是抓取实验</text>
+</svg>

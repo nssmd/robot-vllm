@@ -14,6 +14,7 @@ research/
 *.log
 *.env
 .venv/
+.venv-*/
 docs/feishu-*
 docs/rp-sources/
 docs/array-provenance-v03.json

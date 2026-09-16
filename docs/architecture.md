@@ -76,6 +76,18 @@ active/active failover are outside this release.
 
 ## Model and VLA boundary
 
+Each model alias owns one FIFO inference pool shared by every task in its
+`RobotSystem`. Admission precedes observation collection for planners and model
+nodes. Node deadlines include admission and observation. Cancellation removes
+queued work and discards late responses; a started blocking HTTP transport keeps
+its slot until it actually returns. Pool limits are process-local, not a global
+quota across deployments or aliases. See [robot serving](ROBOT_SERVING.md) for
+configuration, metrics and the distinction between transport overlap and model
+compute acceleration.
+
+Action and terminal no-action proposals both require a valid observation ticket.
+Output validation and device-side admission remain necessary after inference.
+
 GP6/LLM gateways support explicitly configured Chat Completions and Responses
 endpoints. The Responses adapter accepts completed SSE envelopes; partial output
 is not a plan. HTTP redirects do not forward credentials. Model identity checks

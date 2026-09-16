@@ -22,6 +22,10 @@ class ProviderError(RuntimeError):
     """Provider/transport failure, excluded from task denominators."""
 
 
+class ProviderTimeout(ProviderError):
+    """A provider operation exceeded its configured timeout."""
+
+
 @dataclass(frozen=True)
 class Observation:
     episode_id: str

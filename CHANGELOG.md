@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+- Add bounded shared-perception caching with immutable frame/query identities,
+  concurrent subscriber sharing, source-generation invalidation and expiry.
+- Add an actual-model MuJoCo visual-reaching comparison with independent,
+  shared and compact-shared sensing, provider token metering, preserved manifests,
+  and paired latency/blocking analysis.
+
+- Share bounded FIFO inference admission across all tasks using a model alias;
+  sample observations after admission and retain capacity for canceled HTTP calls
+  until the underlying transport finishes.
+- Cancel queued/inflight model waits on DAG stop and reject expired terminal
+  no-action decisions as well as expired actions.
+- Expose authenticated `/inference` capacity metrics, per-call queue wait, a local
+  HTTP latency-overlap benchmark and the robot-serving architecture document.
+
+- Validate VLA request envelopes before inference and return explicit 502/504
+  provider errors without exposing upstream exception text.
+- Classify OpenPI timeouts separately and verify fresh-connection recovery after
+  metadata or inference timeouts, plus bridge admission recovery after failures.
+- Ignore the ROS virtual environment used by the documented walkthrough.
+- Require FastAPI 0.108.0 or newer so HTTP body-limit middleware can replay
+  cached request bodies in ROS environments inheriting older system packages.
+- Declare the repository's Ruff checks explicitly for consistent local validation.
+
 ## 0.5.0
 
 - Add official OpenPI client as a pinned optional third-party dependency and expose π0.5-DROID as a VLA provider.

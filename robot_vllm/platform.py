@@ -59,6 +59,21 @@ class RobotSystem:
         values = await asyncio.gather(*(self.runtime.observe(name) for name in leaves))
         return {name: value["data"] for name, value in zip(leaves, values)}
 
+    async def _plan(self, planner, context, meter, phase_times):
+        async with planner.admit() as admitted:
+            tick = time.monotonic()
+            observations = await self._planning_observations()
+            phase_times["perception_time_s"] += time.monotonic() - tick
+            tick = time.monotonic()
+            try:
+                return await admitted.plan({**context, "observations": observations}, meter)
+            finally:
+                phase_times["planning_time_s"] += time.monotonic() - tick
+
+    def inference_status(self):
+        return {"scope": "per-model-alias totals for this coordinator process",
+                "models": {name: endpoint.pool.snapshot() for name, endpoint in self.endpoints.items()}}
+
     async def run(self, task: str, *, plan=None, deadline_s=300.0, task_id=None,
                   _completed=None, _attempt=0):
         if not isinstance(task, str) or not task.strip() or len(task) > 12000:
@@ -85,7 +100,10 @@ class RobotSystem:
         write_json(output / "request.json", {"task_id": task_id, "task": task,
             "max_parallel": self.max_parallel, "max_replans": self.max_replans,
             "deadline_s": deadline_s, "planner": self.planner_name if planner else "provided_plan",
-            "models": {name: {"kind": e.kind, "model": e.model} for name, e in self.endpoints.items()}})
+            "models": {name: {"kind": e.kind, "model": e.model, "timeout_s": e.timeout,
+                "inference": {"max_concurrency": e.pool.limit, "max_queue": e.pool.max_queue,
+                              "queue_timeout_s": e.pool.queue_timeout}}
+                for name, e in self.endpoints.items()}})
         result = {"status": "infra", "reason": "not_started", "nodes": {}, "task_verdict": None}
         if self.runtime.store and self.runtime.store.task(task_id) is None:
             self.runtime.store.accept_task(task_id, None, "", {"task_id": task_id, "status": "planning",
@@ -98,16 +116,11 @@ class RobotSystem:
                     result.update(status="failed", reason="system_deadline")
                     break
                 if planner is not None:
-                    perception_started = time.monotonic()
-                    initial_observations = await self._planning_observations()
-                    phase_times["perception_time_s"] += time.monotonic() - perception_started
                     context = {"schema": "robot_runtime.planning_context.v1", "task_id": task_id, "task": task,
                         "capabilities": self.runtime.catalog(), "topology": self.runtime.topology(),
-                        "policies": list(policies), "observations": initial_observations,
+                        "policies": list(policies),
                         "completed": completed, "previous_result": history[-1] if history else None}
-                    planning_started = time.monotonic()
-                    payload = await asyncio.wait_for(planner.plan(context, meter), remaining)
-                    phase_times["planning_time_s"] += time.monotonic() - planning_started
+                    payload = await asyncio.wait_for(self._plan(planner, context, meter, phase_times), remaining)
                 else:
                     payload = plan
                 write_json(output / f"candidate-{revision:03d}.json", payload)
@@ -256,6 +269,8 @@ class RobotSystem:
 
     async def close(self):
         self.closing = True
+        for endpoint in self.endpoints.values():
+            endpoint.pool.close()
         pending = [(key, work) for key, work in self.tasks.items() if not work.done()]
         for key, _ in pending:
             await self.cancel(key)

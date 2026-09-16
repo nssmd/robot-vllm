@@ -7,6 +7,7 @@ import asyncio
 import math
 
 from .control import Rejected
+from .protocol import ProviderError, ProviderTimeout
 
 
 class JointActionCodec:
@@ -81,10 +82,18 @@ does not execute robot actions. Use an ASGI server behind a bounded request prox
                 raw.extend(chunk)
             import json
             body = json.loads(raw)
-            if body.get("schema") != "robot_runtime.vla_request.v1" or body.get("model") != model:
+            if not isinstance(body, dict) or body.get("schema") != "robot_runtime.vla_request.v1" or body.get("model") != model:
                 raise Rejected("vla_contract_or_model_mismatch")
             context = body["context"]
+            if not isinstance(context, dict):
+                raise Rejected("invalid_vla_context")
             observation = context["observation"]
+            node = context["node"]
+            if (not isinstance(observation, dict) or not isinstance(node, dict)
+                    or not isinstance(observation.get("data"), dict)
+                    or not isinstance(observation.get("observation_id"), str) or not observation["observation_id"]
+                    or not isinstance(node.get("capability"), str) or not node["capability"]):
+                raise Rejected("invalid_vla_observation_or_capability")
             prediction = await policy.predict(context)
             if not isinstance(prediction, dict) or set(prediction) != {"actions", "done"} or type(prediction["done"]) is not bool:
                 raise Rejected("invalid_policy_prediction")
@@ -93,8 +102,12 @@ does not execute robot actions. Use an ASGI server behind a bounded request prox
                 raise Rejected("empty_nonterminal_prediction")
             arguments = None if actions is None else codec.encode(actions, observation["data"])
             return {"schema": "robot_runtime.node_proposal.v1", "model": model,
-                "observation_id": observation["observation_id"], "capability": context["node"]["capability"],
+                "observation_id": observation["observation_id"], "capability": node["capability"],
                 "arguments": arguments, "done": prediction["done"]}
+        except (ProviderTimeout, TimeoutError) as exc:
+            raise HTTPException(504, "vla_provider_timeout") from exc
+        except ProviderError as exc:
+            raise HTTPException(502, "vla_provider_error") from exc
         except (Rejected, KeyError, ValueError, TypeError) as exc:
             raise HTTPException(422, "invalid_vla_request_or_prediction:" + type(exc).__name__) from exc
         finally:

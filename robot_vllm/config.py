@@ -118,7 +118,7 @@ def validate_config(config):
         raise ValueError("invalid_models")
     for alias, model in models.items():
         keys(model, {"kind", "model", "endpoint", "endpoint_env", "key_env", "timeout_s",
-            "reasoning_effort", "stream", "structured_output", "verify_model"}, ["kind", "model"], "model")
+            "reasoning_effort", "stream", "structured_output", "verify_model", "inference"}, ["kind", "model"], "model")
         if alias == "code" or model["kind"] not in ("openai_chat", "openai_responses", "vla_json"):
             raise ValueError("invalid_model_kind_or_alias")
         if not isinstance(model["model"], str) or not model["model"]:
@@ -128,6 +128,10 @@ def validate_config(config):
         if model.get("endpoint") and not model["endpoint"].startswith(("http://", "https://")):
             raise ValueError("invalid_model_endpoint")
         number(model.get("timeout_s", 30), 0.01, 120, "model_timeout_s")
+        inference = model.get("inference", {})
+        keys(inference, {"max_concurrency", "max_queue", "queue_timeout_s"}, where="inference")
+        from .inference import InferencePool
+        InferencePool(**inference)
         for flag in ("stream", "structured_output", "verify_model"):
             if flag in model and type(model[flag]) is not bool:
                 raise ValueError("invalid_model_flag:" + flag)

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "robot-vllm"
 version = "0.5.0"
-description = "GP6 task DAGs, VLA policies and multi-robot execution through ROS 2"
+description = "Robot serving runtime for GPT/VLA inference, fresh observations and ROS 2 execution"
 requires-python = ">=3.10"
 readme = "README.md"
 license = "Apache-2.0"
@@ -14,11 +14,11 @@ classifiers = ["Programming Language :: Python :: 3", "Operating System :: POSIX
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=8", "numpy", "pillow", "httpx", "fastapi", "uvicorn"]
+test = ["pytest>=8", "numpy", "pillow", "httpx", "fastapi>=0.108.0", "uvicorn"]
 libero = ["numpy", "pillow"]
-serve = ["fastapi", "uvicorn"]
+serve = ["fastapi>=0.108.0", "uvicorn"]
 simulation = ["mujoco>=3.3,<4", "numpy", "pillow"]
-pi05 = ["openpi-client @ git+https://github.com/Physical-Intelligence/openpi.git@215abfb217dbac7d5f1273282331b9b1866c0479#subdirectory=packages/openpi-client", "websockets>=14,<16", "fastapi", "uvicorn"]
+pi05 = ["openpi-client @ git+https://github.com/Physical-Intelligence/openpi.git@215abfb217dbac7d5f1273282331b9b1866c0479#subdirectory=packages/openpi-client", "websockets>=14,<16", "fastapi>=0.108.0", "uvicorn"]
 
 [project.urls]
 Repository = "https://github.com/nssmd/robot-vllm"
@@ -34,3 +34,6 @@ include = ["robot_vllm*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
